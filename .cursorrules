@@ -1,0 +1,219 @@
+# Nevermist — Project Rules
+# ─────────────────────────────────────────────────────────────────
+# This file tells your AI coding assistant everything it needs to
+# know about Nevermist so every suggestion fits the project.
+# Place at: .cursorrules (project root) or .cursor/rules/nevermist.md
+# ─────────────────────────────────────────────────────────────────
+
+## What this project is
+
+Nevermist is a Progressive Web App (PWA) — a universal capture layer on top of Notion.
+Users connect their Notion account, select destination pages, then capture thoughts via
+text, voice, or photo. AI routes each capture to the right Notion page with priority
+and due date set automatically. Everything works offline.
+
+One screen. One input. Minimal UI. Maximum reliability.
+
+## Tech stack — use exactly these, no substitutions
+
+- Framework: Next.js 15 App Router with TypeScript (strict mode)
+- Styling: Tailwind CSS v4 — utility classes only, no separate CSS files except globals.css
+- Animation: Framer Motion — use AnimatePresence for conditional rendering transitions
+- State: Zustand — four stores: useCaptureStore, usePreviewStore, useQueueStore, useUserStore
+- Database: Supabase (Postgres) via Prisma ORM
+- Auth/Session: iron-session with httpOnly secure cookies
+- Offline: idb library wrapping IndexedDB — never localStorage for queue data
+- PWA: @serwist/next — service worker auto-generated
+- AI: @anthropic-ai/sdk — server-side only, never client-side
+- Notion: @notionhq/client — server-side only, never client-side
+- Push notifications: web-push with VAPID keys
+
+Do NOT suggest:
+- Redux, MobX, Jotai, or any state library other than Zustand
+- CSS Modules, styled-components, or emotion
+- Firebase for anything
+- localStorage for the offline queue (use idb/IndexedDB)
+- React Query or SWR (not needed — data flows through Zustand)
+- Mongoose or any non-Prisma ORM
+- Any client-side Anthropic or Notion API calls
+
+## Project structure — follow exactly
+
+src/
+├── app/                    # Next.js App Router pages and API routes
+│   ├── page.tsx            # THE ONLY MAIN SCREEN — the capture interface
+│   ├── onboarding/page.tsx # Multi-step onboarding flow
+│   ├── settings/page.tsx   # Settings overlay
+│   └── api/                # All server-side API routes
+│       ├── auth/notion/     # Initiate Notion OAuth
+│       ├── auth/callback/   # Handle OAuth callback
+│       ├── auth/session/    # Check session
+│       ├── capture/         # Main AI processing (Claude call)
+│       ├── notion/pages/    # Fetch user's Notion pages
+│       ├── notion/send/     # Send task to Notion
+│       ├── user/config/     # Get/update PageConfig
+│       ├── queue/sync/      # Process offline queue
+│       └── push/            # Push notification subscribe + send
+├── components/             # All React components
+├── lib/                    # Server utilities (ai.ts, notion.ts, prisma.ts, session.ts, encrypt.ts)
+├── hooks/                  # Custom hooks (useCapture, useVoice, useCamera, useOffline, useAuth)
+├── store/                  # Zustand stores (capture.ts, preview.ts, queue.ts, user.ts)
+└── types/                  # TypeScript types (capture.ts, notion.ts, queue.ts)
+
+## TypeScript rules
+
+- Strict mode is on — no `any`, no `as any`, no type assertions without justification
+- All API route handlers must be typed with NextRequest and NextResponse
+- All Zustand stores must have a typed interface before the create() call
+- All Prisma query results must be typed — use the generated Prisma types
+- All Claude API responses must be parsed with try/catch and validated before use
+- Environment variables must be accessed as process.env.VAR_NAME with ! or null checks
+- Never use NEXT_PUBLIC_ prefix except for NEXT_PUBLIC_APP_URL (the only safe client variable)
+
+## Security rules — never violate these
+
+- ANTHROPIC_API_KEY must never appear in client-side code or NEXT_PUBLIC_ variables
+- NOTION_CLIENT_SECRET must never appear in client-side code
+- Notion access tokens are stored AES-256 encrypted in the database — use lib/encrypt.ts
+- All API routes must check session authentication before doing anything else
+- Session cookies must be httpOnly: true, secure: true (in production), sameSite: 'strict'
+- Image data (base64) from photo captures must never be stored — pass directly to Claude and discard
+
+## The AI capture endpoint — /api/capture/route.ts
+
+This is the most important file. Rules:
+- One Claude API call per capture — never split into multiple calls
+- Model: claude-sonnet-4-20250514 (never change this without asking)
+- System prompt is built dynamically per user from their PageConfig entries
+- For text/voice: user message is the raw input string
+- For photo: user message is an image content block with base64 JPEG
+- Response is always parsed as JSON — wrap in try/catch
+- For photo mode: response is an array of task objects
+- max_tokens: 1024 is sufficient — never increase without reason
+- The system prompt template lives in nevermist-system-prompt.txt at project root
+
+## Notion integration rules
+
+Two types of Notion destinations — handle both:
+
+1. Notion Database (isDatabase: true in PageConfig):
+   - Create entry: POST /v1/pages with parent: { database_id }
+   - Set properties: Title, Priority (Select), Due Date (Date), Created (auto)
+   - Property mapping is stored in PageConfig.databaseProps as JSON
+
+2. Notion Plain Page (isDatabase: false in PageConfig):
+   - Create entry: PATCH /v1/blocks/{pageId}/children
+   - Append a to_do block with the task text
+   - Embed metadata inline: "Task text [P2] [Due: Mar 20]"
+
+Always use @notionhq/client — never raw fetch to Notion API.
+Always decrypt the Notion token before use: decrypt(user.notionToken)
+
+## State management — Zustand store rules
+
+Four stores, four jobs:
+
+useCaptureStore: inputValue, inputMode ('text'|'voice'|'photo'|'url'), isProcessing, processingError
+usePreviewStore: visible, cleanedTask, destinationPageId, destinationName, priority, dueDate, isRecurring, recurringPattern, isUrl, sourceUrl, tasks (array for photo mode)
+useQueueStore: items (QueueItem[]), isSyncing, isOnline, failedItems (FailedItem[])
+useUserStore: isAuthenticated, notionWorkspace, pages (PageConfig[]), textPolish, nudgeTime, hasCompletedFirstCapture, hasSeenTagline
+
+Rules:
+- Never access store state directly in components — always use the store hook
+- Never put API calls inside stores — API calls belong in hooks (useCapture.ts etc.)
+- Reset useCaptureStore and usePreviewStore after every successful send
+- useQueueStore.isOnline syncs with navigator.onLine
+
+## Offline queue rules
+
+- Save to IndexedDB BEFORE making any API call — not after
+- Use lib/offline-queue.ts for all IndexedDB operations (addToQueue, getAllQueued, removeFromQueue, markFailed)
+- Sync is sequential — process one item at a time, never parallel
+- Error handling:
+  - 401 (auth revoked) → stop entire sync, show reconnect banner
+  - 404 (page deleted) → skip item, mark as failed, continue sync
+  - 429 (rate limit) → pause, retry with exponential backoff (2s, 4s, 8s)
+  - Network drop → stop, resume on next online event
+- Never delete a queue item until receiving a confirmed 200 from Notion API
+- Show StatusPill with count of queued items when offline
+
+## Component rules
+
+- All components are client components ('use client') unless they fetch data — then server components
+- CaptureInput must always be focused on mount — use autoFocus or ref.focus()
+- SendButton opacity: 0 when input is empty, opacity: 1 when input has content — use CSS transition not conditional rendering (avoids layout shift)
+- PreviewCard uses AnimatePresence from Framer Motion — mount/unmount with slide-up animation
+- ConfirmationToast auto-dismisses after 5000ms — use setTimeout in useEffect, clear on unmount
+- PagePickerSheet is a bottom sheet on mobile, dropdown on desktop — use @radix-ui/react-dialog
+- Never use position: fixed for any component — use position: sticky or normal flow
+
+## Image compression rules — always compress before Claude
+
+In lib/camera.ts — compressImage() function:
+- Max dimension: 1600px (longest side)
+- Format: JPEG
+- Quality: 0.8
+- Method: canvas drawImage then toBlob
+- Target output: 150–300KB
+- Never send uncompressed photos to the API — upload time and cost matter
+
+## Design system — use these exact values
+
+Colors (as Tailwind arbitrary values or CSS variables):
+- Background: bg-[#0A0A0A]     (main bg)
+- Surface:     bg-[#121212]    (cards, input area)
+- Card:        bg-[#1A1A1A]    (preview card, toast)
+- Border:      border-[#2E2E2E] (default)
+- Text primary: text-[#EDEAE4]
+- Text muted:   text-[#8A847C]
+- Text dim:     text-[#454240]
+- Amber accent: text-[#C49A6C] / border-[#C49A6C]  (focus, active, cursor)
+- Sage accent:  text-[#6BA888] / border-[#6BA888]  (Notion, confirmed, done)
+
+Fonts (set in layout.tsx via Google Fonts):
+- Lora (serif) — user content: input text, task text, extracted items
+- DM Sans — UI labels, descriptions, body
+- DM Mono — tags, buttons, metadata, status pill
+
+Input styling — the signature detail:
+- border-l-[1.5px] border-[#2E2E2E] (resting)
+- focus:border-[#C49A6C] transition-colors duration-250 (focused)
+- No box, no background, no border-radius — left border ONLY
+
+Animation values (use in Framer Motion):
+- Preview card slide-up: initial={{y:"100%",opacity:0}} animate={{y:0,opacity:1}} transition={{duration:0.3,ease:[0.16,1,0.3,1]}}
+- Toast: same as above but duration 0.25
+- Send button: initial={{opacity:0}} animate={{opacity: hasContent ? 1 : 0}} transition={{duration:0.15}}
+
+## Naming conventions
+
+Files: PascalCase for components (CaptureInput.tsx), camelCase for utilities (offline-queue.ts)
+Functions: camelCase (buildSystemPrompt, compressImage, addToQueue)
+Types/Interfaces: PascalCase (CaptureResult, PageConfig, QueueItem)
+Zustand stores: useCaptureStore, usePreviewStore, useQueueStore, useUserStore
+API routes: always route.ts inside a folder matching the URL path
+Environment variables: SCREAMING_SNAKE_CASE
+
+## What NOT to do — ever
+
+- Do not add a navigation bar, header menu, or bottom tab bar — one screen only
+- Do not show task history in the app — the app is not a task viewer
+- Do not add a "clear all" or "manage queue" UI — the queue is silent
+- Do not show the AI Polish toggle per-capture — it belongs in Settings only
+- Do not store any task content in the database — it flows to Notion and is discarded
+- Do not call the Anthropic API or Notion API from the client — server-side only
+- Do not use window.localStorage for offline queue — use IndexedDB via idb
+- Do not make the confirmation toast dismissible by clicking — it auto-dismisses after 5s
+- Do not add animations that don't respect prefers-reduced-motion
+- Do not change the model from claude-sonnet-4-20250514 without discussion
+
+## When you are unsure
+
+If a feature, pattern, or architectural decision is not covered in these rules:
+1. Check the Design + Architecture Document first
+2. Check the PRD second
+3. Check the Tech Stack Document third
+4. If still unclear — ask before implementing
+
+The three reference documents (PRD, Design + Architecture Doc, Tech Stack Doc) are the
+source of truth. These rules are a compressed version of what's in those documents.
