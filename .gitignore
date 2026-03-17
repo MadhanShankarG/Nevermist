@@ -38,3 +38,4 @@ Thumbs.db
 # Docs 
 *.docx
 *.doc
+/generated/prisma

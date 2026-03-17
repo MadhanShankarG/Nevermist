@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String       @id @default(cuid())
+  notionToken          String
+  notionWorkspaceId    String       @unique
+  notionWorkspaceName  String
+  textPolish           Boolean      @default(true)
+  nudgeTime            String?
+  pushSubscription     String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  pages                PageConfig[]
+}
+
+model PageConfig {
+  id             String   @id @default(cuid())
+  userId         String
+  notionPageId   String
+  name           String
+  description    String
+  isDatabase     Boolean  @default(false)
+  databaseProps  String?
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}

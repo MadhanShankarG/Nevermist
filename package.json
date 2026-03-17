@@ -1,0 +1,51 @@
+{
+  "name": "nevermist",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MadhanShankarG/Nevermist.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MadhanShankarG/Nevermist/issues"
+  },
+  "homepage": "https://github.com/MadhanShankarG/Nevermist#readme",
+  "description": "",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@notionhq/client": "^2.3.0",
+    "@prisma/client": "^6.19.2",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@serwist/next": "^9.5.7",
+    "framer-motion": "^11.18.2",
+    "idb": "^8.0.3",
+    "iron-session": "^8.0.4",
+    "next": "^15.5.13",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "web-push": "^3.6.7",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.1",
+    "@types/node": "^22.19.15",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/web-push": "^3.6.4",
+    "dotenv": "^17.3.1",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^15.5.13",
+    "prisma": "^6.19.2",
+    "tailwindcss": "^4.2.1",
+    "typescript": "^5.9.3"
+  }
+}
