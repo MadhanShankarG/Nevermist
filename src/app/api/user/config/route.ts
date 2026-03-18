@@ -14,6 +14,69 @@ export async function GET() {
   return NextResponse.json({ pages })
 }
 
+export async function POST(request: NextRequest) {
+  const auth = await requireAuth()
+  if (!isAuthenticated(auth)) return auth
+
+  try {
+    const body = await request.json()
+    const { pages } = body
+
+    if (!pages || !Array.isArray(pages)) {
+      return NextResponse.json(
+        { error: 'pages array is required' },
+        { status: 400 }
+      )
+    }
+
+    // Enforce max 6 pages
+    if (pages.length > 6) {
+      return NextResponse.json(
+        { error: 'Maximum 6 pages allowed' },
+        { status: 400 }
+      )
+    }
+
+    // Delete existing page configs for this user (full replace on onboarding)
+    await prisma.pageConfig.deleteMany({
+      where: { userId: auth.userId },
+    })
+
+    // Create new page configs
+    const created = await prisma.pageConfig.createMany({
+      data: pages.map(
+        (
+          page: {
+            notionPageId: string
+            name: string
+            description: string
+            isDatabase?: boolean
+            databaseProps?: string | null
+            sortOrder?: number
+          },
+          index: number
+        ) => ({
+          userId: auth.userId,
+          notionPageId: page.notionPageId,
+          name: page.name,
+          description: page.description,
+          isDatabase: page.isDatabase ?? false,
+          databaseProps: page.databaseProps ?? null,
+          sortOrder: page.sortOrder ?? index,
+        })
+      ),
+    })
+
+    return NextResponse.json({ success: true, count: created.count })
+  } catch (err) {
+    console.error('Error saving config:', err)
+    return NextResponse.json(
+      { error: 'Failed to save config' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function PUT(request: NextRequest) {
   const auth = await requireAuth()
   if (!isAuthenticated(auth)) return auth
