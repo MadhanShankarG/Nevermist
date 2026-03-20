@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { CaptureResult } from '@/types/capture'
 
 interface PreviewState {
   visible: boolean
@@ -11,13 +12,7 @@ interface PreviewState {
   recurringPattern: string | null
   isUrl: boolean
   sourceUrl: string | null
-  tasks: Array<{
-    cleanedTask: string
-    destinationPageId: string
-    destinationName: string
-    priority: 'P1' | 'P2' | 'P3'
-    dueDate: string | null
-  }>
+  tasks: CaptureResult[]
 }
 
 interface PreviewActions {

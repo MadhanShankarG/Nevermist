@@ -4,7 +4,10 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
+import { useCapture } from '@/hooks/useCapture'
 import { useCaptureStore } from '@/store/capture'
+import { usePreviewStore } from '@/store/preview'
+import { useUserStore } from '@/store/user'
 import { useQueueStore } from '@/store/queue'
 import CaptureInput from '@/components/CaptureInput'
 import SendButton from '@/components/SendButton'
@@ -12,6 +15,8 @@ import VoiceButton from '@/components/VoiceButton'
 import CameraButton from '@/components/CameraButton'
 import StatusPill from '@/components/StatusPill'
 import QuickChips from '@/components/QuickChips'
+import PreviewCard from '@/components/PreviewCard'
+import ConfirmationToast from '@/components/ConfirmationToast'
 
 // Stagger animation variants — each element animates in 600ms ease-out
 const makeVariant = (delayMs: number) => ({
@@ -21,7 +26,7 @@ const makeVariant = (delayMs: number) => ({
     y: 0,
     transition: {
       duration: 0.6,
-      ease: [0, 0, 0.2, 1], // ease-out
+      ease: [0, 0, 0.2, 1],
       delay: delayMs / 1000,
     },
   },
@@ -34,20 +39,56 @@ const INPUT_ACTIONS = makeVariant(300)
 const DIVIDER = makeVariant(400)
 const QUICK_CHIPS = makeVariant(500)
 
+interface ToastData {
+  destinationName: string
+  priority: 'P1' | 'P2' | 'P3'
+  dueDate: string | null
+}
+
 export default function Home() {
   const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
+
+  // Stores
   const inputValue = useCaptureStore((s) => s.inputValue)
+  const inputMode = useCaptureStore((s) => s.inputMode)
+  const isProcessing = useCaptureStore((s) => s.isProcessing)
+  const processingError = useCaptureStore((s) => s.processingError)
   const setInputMode = useCaptureStore((s) => s.setInputMode)
-  const reset = useCaptureStore((s) => s.reset)
+  const resetCapture = useCaptureStore((s) => s.reset)
+
+  const preview = usePreviewStore()
+  const resetPreview = usePreviewStore((s) => s.reset)
+
+  const hasCompletedFirstCapture = useUserStore((s) => s.hasCompletedFirstCapture)
+  const hasSeenTagline = useUserStore((s) => s.hasSeenTagline)
+  const setHasCompletedFirstCapture = useUserStore((s) => s.setHasCompletedFirstCapture)
+  const setHasSeenTagline = useUserStore((s) => s.setHasSeenTagline)
+  const setPages = useUserStore((s) => s.setPages)
+
   const setIsOnline = useQueueStore((s) => s.setIsOnline)
 
+  // Local state
   const [hasPages, setHasPages] = useState<boolean | null>(null)
   const [isRecording, setIsRecording] = useState(false)
-  // Viewport height — updated on keyboard open/close
   const [viewportH, setViewportH] = useState<string>('100dvh')
+  const [isSending, setIsSending] = useState(false)
+  const [toast, setToast] = useState<ToastData | null>(null)
 
-  // Monitor visual viewport for mobile keyboard
+  // Hydrate persisted state from localStorage
+  useEffect(() => {
+    if (localStorage.getItem('nevermist:firstCapture') === 'true') {
+      setHasCompletedFirstCapture(true)
+    }
+    if (localStorage.getItem('nevermist:seenTagline') === 'true') {
+      setHasSeenTagline(true)
+    }
+  }, [setHasCompletedFirstCapture, setHasSeenTagline])
+
+  // Hooks
+  const { submit } = useCapture()
+
+  // Visual viewport — mobile keyboard
   useEffect(() => {
     const updateViewport = () => {
       if (window.visualViewport) {
@@ -58,7 +99,7 @@ export default function Home() {
     return () => window.visualViewport?.removeEventListener('resize', updateViewport)
   }, [])
 
-  // Online/offline listeners for StatusPill
+  // Online/offline
   useEffect(() => {
     const handleOnline = () => setIsOnline(true)
     const handleOffline = () => setIsOnline(false)
@@ -82,11 +123,12 @@ export default function Home() {
       try {
         const res = await fetch('/api/user/config')
         if (res.ok) {
-          const data = await res.json()
+          const data = await res.json() as { pages?: Array<{ notionPageId: string; name: string; description: string; isDatabase: boolean; databaseProps: string | null; sortOrder: number; id: string; userId: string; createdAt: string }> }
           if (!data.pages || data.pages.length === 0) {
             router.replace('/onboarding')
             return
           }
+          setPages(data.pages.map((p) => ({ ...p, createdAt: new Date(p.createdAt) })))
           setHasPages(true)
         } else {
           router.replace('/onboarding')
@@ -97,15 +139,92 @@ export default function Home() {
     }
 
     checkPages()
-  }, [isAuthenticated, isLoading, router])
+  }, [isAuthenticated, isLoading, router, setPages])
 
-  const handleSend = useCallback(async () => {
+  // ── Handlers ──
+
+  // 1. CaptureInput / SendButton submit → call AI
+  const handleSubmit = useCallback(async () => {
     if (!inputValue.trim()) return
-    // Capture logic will be implemented in Phase 5
-    console.log('Send:', inputValue)
-    reset()
-  }, [inputValue, reset])
+    await submit()
+  }, [inputValue, submit])
 
+  // 2. Send confirmed preview to Notion
+  const handleNotionSend = useCallback(async () => {
+    setIsSending(true)
+    try {
+      const isPhotoMode = preview.tasks.length > 0
+
+      const body = isPhotoMode
+        ? { tasks: preview.tasks }
+        : {
+            cleanedTask: preview.cleanedTask,
+            destinationPageId: preview.destinationPageId,
+            priority: preview.priority,
+            dueDate: preview.dueDate,
+            isRecurring: preview.isRecurring,
+            recurringPattern: preview.recurringPattern,
+            isUrl: preview.isUrl,
+            sourceUrl: preview.sourceUrl,
+          }
+
+      const res = await fetch('/api/notion/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (!res.ok) {
+        const data = await res.json() as { error?: string }
+        throw new Error(data.error || 'Failed to send')
+      }
+
+      // Show toast immediately, reset input immediately
+      setToast({
+        destinationName: preview.destinationName,
+        priority: preview.priority,
+        dueDate: preview.dueDate,
+      })
+
+      // Card exits first, then reset
+      resetPreview()
+      resetCapture()
+
+      // First capture persistence
+      if (!hasCompletedFirstCapture) {
+        setHasCompletedFirstCapture(true)
+        localStorage.setItem('nevermist:firstCapture', 'true')
+      }
+    } catch (err) {
+      console.error('Notion send error:', err)
+    } finally {
+      setIsSending(false)
+    }
+  }, [
+    preview,
+    resetCapture,
+    resetPreview,
+    hasCompletedFirstCapture,
+    setHasCompletedFirstCapture,
+  ])
+
+  // 3. Cancel preview — card slides down, input retains text
+  const handleCancelPreview = useCallback(() => {
+    resetPreview()
+  }, [resetPreview])
+
+  // 4. Toast dismiss
+  const handleToastDismiss = useCallback(() => {
+    setToast(null)
+  }, [])
+
+  // 5. Tagline done
+  const handleTaglineDone = useCallback(() => {
+    setHasSeenTagline(true)
+    localStorage.setItem('nevermist:seenTagline', 'true')
+  }, [setHasSeenTagline])
+
+  // 6. Voice
   const handleVoiceToggle = () => {
     setIsRecording((prev) => {
       const next = !prev
@@ -114,19 +233,19 @@ export default function Home() {
     })
   }
 
+  // 7. Camera
   const handleCameraCapture = () => {
     setInputMode('photo')
-    // Camera capture logic will be implemented in Phase 6
-    console.log('Camera capture')
   }
 
+  // 8. QuickChip clicks
   const handleChipClick = (chipId: string) => {
     if (chipId === 'voice-note') handleVoiceToggle()
     if (chipId === 'scan-notes') handleCameraCapture()
-    // Other chip actions
   }
 
-  // Loading / not-ready state
+  // ── Render ──
+
   if (isLoading || (!isAuthenticated && hasPages === null)) {
     return (
       <main
@@ -149,154 +268,184 @@ export default function Home() {
   if (!hasPages) return null
 
   return (
-    <main
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: viewportH,
-        overflow: 'hidden',
-      }}
-    >
-      <div
+    <>
+      <main
         style={{
-          flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          maxWidth: '800px',
-          width: '100%',
-          margin: '0 auto',
-          padding: '0 40px',
-          // Mobile
+          height: viewportH,
+          overflow: 'hidden',
         }}
-        className="capture-layout"
       >
-        {/* ── TopBar ── */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingTop: '28px',
-            paddingBottom: '40px',
-          }}
-        >
-          <motion.div
-            variants={WORDMARK}
-            initial="hidden"
-            animate="visible"
-          >
-            <span
-              style={{
-                fontFamily: 'var(--font-serif)',
-                fontSize: '14px',
-                fontWeight: 400,
-                color: 'var(--ink)',
-                letterSpacing: '0.2em',
-                textTransform: 'lowercase',
-                userSelect: 'none',
-              }}
-            >
-              nevermist
-            </span>
-          </motion.div>
-
-          <StatusPill />
-        </div>
-
-        {/* ── Main Capture Area ── */}
         <div
           style={{
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'center',
-            gap: '20px',
+            maxWidth: '800px',
+            width: '100%',
+            margin: '0 auto',
+            padding: '0 40px',
           }}
+          className="capture-layout"
         >
-          {/* Italic label */}
-          <motion.p
-            variants={ITALIC_LABEL}
-            initial="hidden"
-            animate="visible"
-            style={{
-              fontFamily: 'var(--font-serif)',
-              fontSize: '11px',
-              fontStyle: 'italic',
-              color: 'var(--ink3)',
-              userSelect: 'none',
-            }}
-          >
-            what&apos;s on your mind?
-          </motion.p>
-
-          {/* Input block */}
-          <motion.div
-            variants={INPUT_BLOCK}
-            initial="hidden"
-            animate="visible"
-          >
-            <CaptureInput onSubmit={handleSend} />
-          </motion.div>
-
-          {/* InputActions row */}
-          <motion.div
-            variants={INPUT_ACTIONS}
-            initial="hidden"
-            animate="visible"
+          {/* ── TopBar ── */}
+          <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: '12px',
+              paddingTop: '28px',
+              paddingBottom: '40px',
             }}
           >
-            {/* Left: voice + camera */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <VoiceButton
-                isRecording={isRecording}
-                onToggle={handleVoiceToggle}
-              />
-              <CameraButton onCapture={handleCameraCapture} />
-            </div>
+            <motion.div variants={WORDMARK} initial="hidden" animate="visible">
+              <span
+                style={{
+                  fontFamily: 'var(--font-serif)',
+                  fontSize: '14px',
+                  fontWeight: 400,
+                  color: 'var(--ink)',
+                  letterSpacing: '0.2em',
+                  textTransform: 'lowercase',
+                  userSelect: 'none',
+                }}
+              >
+                nevermist
+              </span>
+            </motion.div>
+            <StatusPill />
+          </div>
 
-            {/* Right: send */}
-            <SendButton onSend={handleSend} />
+          {/* ── Main Capture Area ── */}
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              gap: '20px',
+            }}
+          >
+            {/* Italic label */}
+            <motion.p
+              variants={ITALIC_LABEL}
+              initial="hidden"
+              animate="visible"
+              style={{
+                fontFamily: 'var(--font-serif)',
+                fontSize: '11px',
+                fontStyle: 'italic',
+                color: 'var(--ink3)',
+                userSelect: 'none',
+              }}
+            >
+              what&apos;s on your mind?
+            </motion.p>
+
+            {/* Input block */}
+            <motion.div variants={INPUT_BLOCK} initial="hidden" animate="visible">
+              <CaptureInput onSubmit={handleSubmit} />
+            </motion.div>
+
+            {/* Processing error */}
+            {processingError && (
+              <p
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '11px',
+                  color: 'var(--red)',
+                  letterSpacing: '0.03em',
+                }}
+              >
+                {processingError}
+              </p>
+            )}
+
+            {/* InputActions row */}
+            <motion.div
+              variants={INPUT_ACTIONS}
+              initial="hidden"
+              animate="visible"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <VoiceButton isRecording={isRecording} onToggle={handleVoiceToggle} />
+                <CameraButton onCapture={handleCameraCapture} />
+              </div>
+
+              {/* SendButton shows AI-processing state while isProcessing */}
+              {isProcessing ? (
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '12px',
+                    color: 'var(--ink3)',
+                    letterSpacing: '0.08em',
+                  }}
+                >
+                  thinking…
+                </span>
+              ) : (
+                <SendButton onSend={handleSubmit} />
+              )}
+            </motion.div>
+          </div>
+
+          {/* ── Divider ── */}
+          <motion.div
+            variants={DIVIDER}
+            initial="hidden"
+            animate="visible"
+            style={{
+              height: '1px',
+              backgroundColor: 'var(--line)',
+              margin: '28px 0',
+              flexShrink: 0,
+            }}
+          />
+
+          {/* ── QuickChips ── */}
+          <motion.div
+            variants={QUICK_CHIPS}
+            initial="hidden"
+            animate="visible"
+            style={{ paddingBottom: '32px', flexShrink: 0 }}
+          >
+            <QuickChips onChipClick={handleChipClick} />
           </motion.div>
         </div>
 
-        {/* ── Divider ── */}
-        <motion.div
-          variants={DIVIDER}
-          initial="hidden"
-          animate="visible"
-          style={{
-            height: '1px',
-            backgroundColor: 'var(--line)',
-            margin: '28px 0',
-            flexShrink: 0,
-          }}
-        />
-
-        {/* ── QuickChips ── */}
-        <motion.div
-          variants={QUICK_CHIPS}
-          initial="hidden"
-          animate="visible"
-          style={{ paddingBottom: '32px', flexShrink: 0 }}
-        >
-          <QuickChips onChipClick={handleChipClick} />
-        </motion.div>
-      </div>
-
-      {/* Mobile responsive styles */}
-      <style>{`
-        @media (max-width: 639px) {
-          .capture-layout {
-            padding-left: 28px !important;
-            padding-right: 28px !important;
+        {/* Mobile responsive styles */}
+        <style>{`
+          @media (max-width: 639px) {
+            .capture-layout {
+              padding-left: 28px !important;
+              padding-right: 28px !important;
+            }
           }
-        }
-      `}</style>
-    </main>
+        `}</style>
+      </main>
+
+      {/* ── Preview Card (portal-like, fixed) ── */}
+      <PreviewCard
+        onSend={handleNotionSend}
+        onCancel={handleCancelPreview}
+        isSending={isSending}
+      />
+
+      {/* ── Confirmation Toast ── */}
+      <ConfirmationToast
+        data={toast}
+        onDismiss={handleToastDismiss}
+        showTagline={!hasSeenTagline && hasCompletedFirstCapture}
+        onTaglineDone={handleTaglineDone}
+      />
+    </>
   )
 }
