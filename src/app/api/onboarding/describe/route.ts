@@ -17,12 +17,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const descriptions = await generatePageDescriptions(pages)
+    let descriptions
+    try {
+      descriptions = await generatePageDescriptions(pages)
+    } catch (err) {
+      console.error('generatePageDescriptions failed — falling back to page names:', err)
+      descriptions = (pages as Array<{ name: string }>).map((p) => ({
+        name: p.name,
+        description: `${p.name} — items and tasks`,
+      }))
+    }
+
     return NextResponse.json({ descriptions })
   } catch (err) {
-    console.error('Error generating descriptions:', err)
+    console.error('Error in onboarding describe route:', err)
     return NextResponse.json(
-      { error: 'Failed to generate descriptions' },
+      { error: 'Failed to process request' },
       { status: 500 }
     )
   }

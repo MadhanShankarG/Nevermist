@@ -3,11 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
+  "dev": "kill -9 $(lsof -ti:3000) 2>/dev/null; next dev -p 3000",
+  "build": "next build",
+  "start": "next start",
+  "lint": "next lint",
+  "db:push": "prisma db push",
+  "db:studio": "prisma studio",
+  "db:generate": "prisma generate"
+},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MadhanShankarG/Nevermist.git"
