@@ -2,7 +2,27 @@
 # ─────────────────────────────────────────────────────────────────
 # This file tells your AI coding assistant everything it needs to
 # know about Nevermist so every suggestion fits the project.
-# Place at: .cursorrules (project root) or .cursor/rules/nevermist.md
+# Place at: .cursorrules (project root)
+# ─────────────────────────────────────────────────────────────────
+
+## Reference Documents
+# Always read the relevant doc before implementing anything.
+# These are in the docs/ folder — use @docs/ to reference them in Cursor.
+
+- PRD (features, scope, user flows, success metrics):
+    docs/prd.md
+- Design + Architecture (components, colors, fonts, spacing, state, data flow, API routes):
+    docs/design-doc.md
+- Tech Stack (setup commands, code patterns, folder structure, starter code):
+    docs/tech-stack.md
+- AI System Prompt (exact prompt for /api/capture — use verbatim):
+    nevermist-system-prompt.txt
+
+When implementing any component        → read docs/design-doc.md first
+When implementing any API route        → read docs/tech-stack.md first
+When building the AI endpoint          → read nevermist-system-prompt.txt exactly
+When unsure about a feature or scope   → read docs/prd.md first
+
 # ─────────────────────────────────────────────────────────────────
 
 ## What this project is
@@ -60,6 +80,19 @@ src/
 ├── store/                  # Zustand stores (capture.ts, preview.ts, queue.ts, user.ts)
 └── types/                  # TypeScript types (capture.ts, notion.ts, queue.ts)
 
+docs/                       # Markdown versions of all reference documents
+├── prd.md
+├── design-doc.md
+└── tech-stack.md
+
+public/
+├── icons/
+│   ├── icon-192.png        # PWA homescreen icon (from nevermist-icon-512.svg)
+│   └── icon-512.png        # PWA splash icon
+├── nevermist-icon-512.svg  # Master SVG icon — N with amber mist dots
+├── nevermist-wordmark.svg  # Wordmark — "never" in #EDEAE4, "mist" in #C49A6C
+└── nevermist-favicon.svg   # Favicon — simplified icon mark
+
 ## TypeScript rules
 
 - Strict mode is on — no `any`, no `as any`, no type assertions without justification
@@ -70,6 +103,26 @@ src/
 - Environment variables must be accessed as process.env.VAR_NAME with ! or null checks
 - Never use NEXT_PUBLIC_ prefix except for NEXT_PUBLIC_APP_URL (the only safe client variable)
 
+## Environment variables — complete list
+
+Required in .env.local (never commit this file):
+
+  ANTHROPIC_API_KEY          # From console.anthropic.com — server only
+  NOTION_CLIENT_ID           # From notion.so/my-integrations — server only
+  NOTION_CLIENT_SECRET       # From notion.so/my-integrations — server only
+  NOTION_REDIRECT_URI        # http://localhost:3000/api/auth/callback (dev)
+  DATABASE_URL               # From Supabase → Settings → Database → URI
+  SESSION_SECRET             # 64-char hex — generate with crypto.randomBytes(32)
+  ENCRYPTION_KEY             # 64-char hex — DIFFERENT value from SESSION_SECRET
+  VAPID_PUBLIC_KEY           # From: npx web-push generate-vapid-keys
+  VAPID_PRIVATE_KEY          # From: npx web-push generate-vapid-keys
+  VAPID_SUBJECT              # mailto:your@email.com
+  CRON_SECRET                # 64-char hex — protects /api/push/send from public access
+  NEXT_PUBLIC_APP_URL        # http://localhost:3000 (dev) / https://yourdomain.com (prod)
+
+SESSION_SECRET and ENCRYPTION_KEY must be different values — never reuse.
+CRON_SECRET is checked in /api/push/send via: req.headers.get('x-cron-secret')
+
 ## Security rules — never violate these
 
 - ANTHROPIC_API_KEY must never appear in client-side code or NEXT_PUBLIC_ variables
@@ -78,6 +131,8 @@ src/
 - All API routes must check session authentication before doing anything else
 - Session cookies must be httpOnly: true, secure: true (in production), sameSite: 'strict'
 - Image data (base64) from photo captures must never be stored — pass directly to Claude and discard
+- /api/push/send must check x-cron-secret header before processing — return 401 if missing or wrong
+- Rate limit /api/capture: max 60 requests per user per hour — use in-memory counter or Upstash Redis
 
 ## The AI capture endpoint — /api/capture/route.ts
 
@@ -91,6 +146,10 @@ This is the most important file. Rules:
 - For photo mode: response is an array of task objects
 - max_tokens: 1024 is sufficient — never increase without reason
 - The system prompt template lives in nevermist-system-prompt.txt at project root
+- Input sanitisation: strip HTML tags and null bytes before sending to Claude
+  inputValue.replace(/<[^>]*>/g, '').replace(/\0/g, '').slice(0, 500)
+- Image validation before compression: check file.size < 20MB and
+  ['image/jpeg','image/png','image/webp'].includes(file.type)
 
 ## Notion integration rules
 
@@ -150,6 +209,7 @@ Rules:
 ## Image compression rules — always compress before Claude
 
 In lib/camera.ts — compressImage() function:
+- Validate first: file.size < 20MB AND type in ['image/jpeg','image/png','image/webp']
 - Max dimension: 1600px (longest side)
 - Format: JPEG
 - Quality: 0.8
@@ -160,30 +220,56 @@ In lib/camera.ts — compressImage() function:
 ## Design system — use these exact values
 
 Colors (as Tailwind arbitrary values or CSS variables):
-- Background: bg-[#0A0A0A]     (main bg)
-- Surface:     bg-[#121212]    (cards, input area)
-- Card:        bg-[#1A1A1A]    (preview card, toast)
+- Background: bg-[#0A0A0A]      (main bg)
+- Surface:     bg-[#121212]     (cards, input area)
+- Card:        bg-[#1A1A1A]     (preview card, toast)
 - Border:      border-[#2E2E2E] (default)
 - Text primary: text-[#EDEAE4]
 - Text muted:   text-[#8A847C]
 - Text dim:     text-[#454240]
 - Amber accent: text-[#C49A6C] / border-[#C49A6C]  (focus, active, cursor)
 - Sage accent:  text-[#6BA888] / border-[#6BA888]  (Notion, confirmed, done)
+- P1 priority:  text-[#B86B5A] bg-[#1E0E0A]
+- P2 priority:  text-[#C4944A] bg-[#1E1608]
+- Orange badge: #E8773A (camera icon dot only)
 
 Fonts (set in layout.tsx via Google Fonts):
-- Lora (serif) — user content: input text, task text, extracted items
-- DM Sans — UI labels, descriptions, body
-- DM Mono — tags, buttons, metadata, status pill
+- Lora (serif)   — user content: input text, task text, extracted items, main headline
+- DM Sans        — UI labels, descriptions, body text, confirmation messages
+- DM Mono        — tags, send button, status pill, screen labels, metadata, system chrome
 
 Input styling — the signature detail:
 - border-l-[1.5px] border-[#2E2E2E] (resting)
-- focus:border-[#C49A6C] transition-colors duration-250 (focused)
+- focus:border-[#C49A6C] transition-colors duration-[250ms] (focused)
 - No box, no background, no border-radius — left border ONLY
+- caret-color: #C49A6C (amber cursor)
+- padding-left: 20px (text indented from border)
 
 Animation values (use in Framer Motion):
 - Preview card slide-up: initial={{y:"100%",opacity:0}} animate={{y:0,opacity:1}} transition={{duration:0.3,ease:[0.16,1,0.3,1]}}
 - Toast: same as above but duration 0.25
 - Send button: initial={{opacity:0}} animate={{opacity: hasContent ? 1 : 0}} transition={{duration:0.15}}
+- Cancel / card exit: scale 0.95 + opacity 0, duration 0.2, ease:"easeIn"
+- Page load stagger: each element 100ms apart, 600ms ease-out, opacity 0→1 + translateY 10px→0
+- Voice pulse: scale 1→1.15→1, 1.2s loop ease-in-out
+- Voice ring: opacity 0.3→0 + scale 1→2, 1.2s loop ease-out
+All animations must use useReducedMotion() from Framer Motion — skip if true.
+
+## Logo and brand assets
+
+SVG source files live in public/:
+- public/nevermist-icon-512.svg  — master app icon (N letterform + amber mist dots)
+- public/nevermist-wordmark.svg  — "never" (#EDEAE4) + "mist" (#C49A6C) in Lora serif
+- public/nevermist-favicon.svg   — simplified icon for browser tab
+
+PNG exports for PWA manifest (generate from SVG):
+- public/icons/icon-192.png  — 192×192px
+- public/icons/icon-512.png  — 512×512px
+
+PWA manifest (public/manifest.json):
+- background_color: "#0A0A0A"
+- theme_color: "#0A0A0A"
+- display: "standalone"
 
 ## Naming conventions
 
@@ -206,14 +292,17 @@ Environment variables: SCREAMING_SNAKE_CASE
 - Do not make the confirmation toast dismissible by clicking — it auto-dismisses after 5s
 - Do not add animations that don't respect prefers-reduced-motion
 - Do not change the model from claude-sonnet-4-20250514 without discussion
+- Do not send unvalidated or unsanitised input to the Claude API
+- Do not expose raw API error messages to the client — always return user-friendly copy
+- Do not skip the CRON_SECRET check on /api/push/send
 
 ## When you are unsure
 
 If a feature, pattern, or architectural decision is not covered in these rules:
-1. Check the Design + Architecture Document first
-2. Check the PRD second
-3. Check the Tech Stack Document third
+1. Check docs/design-doc.md first
+2. Check docs/prd.md second
+3. Check docs/tech-stack.md third
 4. If still unclear — ask before implementing
 
-The three reference documents (PRD, Design + Architecture Doc, Tech Stack Doc) are the
-source of truth. These rules are a compressed version of what's in those documents.
+The three reference documents are the source of truth.
+These rules are a compressed version of what is in those documents.
