@@ -143,7 +143,15 @@ export default function PreviewCard({ onSend, onCancel, isSending }: PreviewCard
               >
                 {/* ── Photo mode: task chip list ── */}
                 {isPhotoMode ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      maxHeight: '50vh',
+                      overflowY: 'auto',
+                    }}
+                  >
                     <span
                       style={{
                         fontFamily: 'var(--font-mono)',
@@ -327,7 +335,11 @@ export default function PreviewCard({ onSend, onCancel, isSending }: PreviewCard
                       if (!isSending) e.currentTarget.style.backgroundColor = 'var(--ink)'
                     }}
                   >
-                    {isSending ? 'sending…' : 'send to notion'}
+                    {isSending
+                      ? 'sending…'
+                      : isPhotoMode && localTasks.length > 1
+                        ? `send ${localTasks.length} tasks`
+                        : 'send to notion'}
                   </button>
                 </div>
               </div>
