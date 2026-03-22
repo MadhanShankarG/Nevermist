@@ -55,7 +55,16 @@ async function sendSingleTask(
       }
     }
 
-    const titleProp = props.titlePropName ?? 'Name'
+    // Fetch the live database schema to find the real title property name.
+    // The title property is not always "Name" — it varies per database.
+    const dbSchema = await notion.databases.retrieve({
+      database_id: task.destinationPageId,
+    })
+    const titleProp =
+      Object.entries(dbSchema.properties).find(
+        ([, prop]) => prop.type === 'title',
+      )?.[0] ?? props.titlePropName ?? 'Name'
+
     const priorityProp = props.priorityPropName ?? null
     const dueDateProp = props.dueDatePropName ?? null
 

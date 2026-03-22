@@ -75,8 +75,12 @@ export async function GET(request: NextRequest) {
     session.isAuthenticated = true
     await session.save()
 
-    // Redirect to onboarding
-    return NextResponse.redirect(new URL('/onboarding', request.url))
+    // Redirect existing users home, new users to onboarding
+    const existingPages = await prisma.pageConfig.count({
+      where: { userId: user.id },
+    })
+    const destination = existingPages > 0 ? '/' : '/onboarding'
+    return NextResponse.redirect(new URL(destination, request.url))
   } catch (err) {
     console.error('OAuth callback error:', err)
     return NextResponse.redirect(new URL('/?error=auth_failed', request.url))
