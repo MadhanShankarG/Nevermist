@@ -76,6 +76,7 @@ async function sendSingleTask(
     // validation errors on databases with non-standard schemas.
     const hasPriorityProp = priorityPropName in schemaProps
     const hasDueDateProp = dueDatePropName in schemaProps
+    const hasStatusProp = 'Status' in schemaProps
 
     // Map internal codes to the option names used in the Nevermist Captures template
     const priorityOptionName =
@@ -98,6 +99,10 @@ async function sendSingleTask(
 
     if (hasDueDateProp && task.dueDate) {
       properties[dueDatePropName] = { date: { start: task.dueDate } }
+    }
+
+    if (hasStatusProp) {
+      properties['Status'] = { select: { name: 'To Do' } }
     }
 
     if (task.isUrl && task.sourceUrl && 'URL' in schemaProps) {
