@@ -55,18 +55,35 @@ async function sendSingleTask(
       }
     }
 
-    // Fetch the live database schema to find the real title property name.
-    // The title property is not always "Name" — it varies per database.
+    // Fetch the live database schema — resolves title property name and
+    // guards against setting properties that don't exist in this database.
     const dbSchema = await notion.databases.retrieve({
       database_id: task.destinationPageId,
     })
-    const titleProp =
-      Object.entries(dbSchema.properties).find(
-        ([, prop]) => prop.type === 'title',
-      )?.[0] ?? props.titlePropName ?? 'Name'
+    const schemaProps = dbSchema.properties
 
-    const priorityProp = props.priorityPropName ?? null
-    const dueDateProp = props.dueDatePropName ?? null
+    const titleProp =
+      Object.entries(schemaProps).find(([, prop]) => prop.type === 'title')?.[0] ??
+      props.titlePropName ??
+      'Name'
+
+    // Priority: custom prop name from config, or fall back to "Priority"
+    const priorityPropName = props.priorityPropName ?? 'Priority'
+    // Due date: custom prop name from config, or fall back to "Due Date"
+    const dueDatePropName = props.dueDatePropName ?? 'Due Date'
+
+    // Only set a property if it actually exists in the schema — prevents
+    // validation errors on databases with non-standard schemas.
+    const hasPriorityProp = priorityPropName in schemaProps
+    const hasDueDateProp = dueDatePropName in schemaProps
+
+    // Map internal codes to the option names used in the Nevermist Captures template
+    const priorityOptionName =
+      task.priority === 'P1'
+        ? 'P1 — Urgent'
+        : task.priority === 'P2'
+          ? 'P2 — Important'
+          : 'P3 — Someday'
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const properties: Record<string, any> = {
@@ -75,16 +92,15 @@ async function sendSingleTask(
       },
     }
 
-    if (priorityProp) {
-      properties[priorityProp] = { select: { name: task.priority } }
+    if (hasPriorityProp) {
+      properties[priorityPropName] = { select: { name: priorityOptionName } }
     }
 
-    if (dueDateProp && task.dueDate) {
-      properties[dueDateProp] = { date: { start: task.dueDate } }
+    if (hasDueDateProp && task.dueDate) {
+      properties[dueDatePropName] = { date: { start: task.dueDate } }
     }
 
-    if (task.isUrl && task.sourceUrl) {
-      // Try to set a URL property if one exists
+    if (task.isUrl && task.sourceUrl && 'URL' in schemaProps) {
       properties['URL'] = { url: task.sourceUrl }
     }
 

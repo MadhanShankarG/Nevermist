@@ -11,17 +11,38 @@ interface TaskChipProps {
   pages: Array<{ notionPageId: string; name: string }>
 }
 
-const PRIORITY_COLORS: Record<string, { text: string; bg: string }> = {
-  P1: { text: 'var(--red)', bg: 'var(--red-bg)' },
-  P2: { text: 'var(--amber)', bg: 'var(--amb-bg)' },
-  P3: { text: 'var(--ink3)', bg: 'var(--bg4)' },
+const PRIORITY_CYCLE: Record<string, 'P1' | 'P2' | 'P3'> = {
+  P1: 'P2',
+  P2: 'P3',
+  P3: 'P1',
 }
 
-export default function TaskChip({ task, index, onRemove, onUpdate, pages }: TaskChipProps) {
+const PRIORITY_COLORS: Record<
+  string,
+  { text: string; bg: string; border: string }
+> = {
+  P1: { text: '#C07060', bg: '#1E0E0A', border: '#3A1A14' },
+  P2: { text: '#C4944A', bg: '#1E1608', border: '#3A2A10' },
+  P3: { text: '#6BA888', bg: '#0E1A14', border: '#1A3028' },
+}
+
+export default function TaskChip({
+  task,
+  index,
+  onRemove,
+  onUpdate,
+  pages,
+}: TaskChipProps) {
   const isUncertain = task.cleanedTask.includes('[?]')
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(task.cleanedTask)
   const [showPagePicker, setShowPagePicker] = useState(false)
+
+  // Local priority state — initialised from prop, propagated up on every change
+  const [priority, setPriority] = useState<'P1' | 'P2' | 'P3'>(
+    task.priority ?? 'P2',
+  )
+
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -33,7 +54,14 @@ export default function TaskChip({ task, index, onRemove, onUpdate, pages }: Tas
     setIsEditing(false)
   }
 
-  const priorityStyle = PRIORITY_COLORS[task.priority] ?? PRIORITY_COLORS.P2
+  const cyclePriority = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const next = PRIORITY_CYCLE[priority] ?? 'P2'
+    setPriority(next)
+    onUpdate(index, { priority: next })
+  }
+
+  const priorityStyle = PRIORITY_COLORS[priority] ?? PRIORITY_COLORS.P2
 
   return (
     <div
@@ -57,7 +85,10 @@ export default function TaskChip({ task, index, onRemove, onUpdate, pages }: Tas
           onBlur={commitEdit}
           onKeyDown={(e) => {
             if (e.key === 'Enter') commitEdit()
-            if (e.key === 'Escape') { setEditValue(task.cleanedTask); setIsEditing(false) }
+            if (e.key === 'Escape') {
+              setEditValue(task.cleanedTask)
+              setIsEditing(false)
+            }
           }}
           style={{
             fontFamily: 'var(--font-serif)',
@@ -86,11 +117,21 @@ export default function TaskChip({ task, index, onRemove, onUpdate, pages }: Tas
       )}
 
       {/* Bottom row: destination + priority + actions */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          flexWrap: 'wrap',
+        }}
+      >
         {/* Destination badge */}
         <div style={{ position: 'relative' }}>
           <button
-            onClick={() => setShowPagePicker((p) => !p)}
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowPagePicker((p) => !p)
+            }}
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: '10px',
@@ -100,6 +141,7 @@ export default function TaskChip({ task, index, onRemove, onUpdate, pages }: Tas
               borderRadius: '4px',
               padding: '2px 6px',
               cursor: 'pointer',
+              minHeight: '28px',
             }}
           >
             {task.destinationName}
@@ -122,7 +164,8 @@ export default function TaskChip({ task, index, onRemove, onUpdate, pages }: Tas
               {pages.map((page) => (
                 <button
                   key={page.notionPageId}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation()
                     onUpdate(index, {
                       destinationPageId: page.notionPageId,
                       destinationName: page.name,
@@ -142,8 +185,12 @@ export default function TaskChip({ task, index, onRemove, onUpdate, pages }: Tas
                     cursor: 'pointer',
                     borderBottom: '1px solid var(--line)',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg4)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.backgroundColor = 'var(--bg4)')
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.backgroundColor = 'transparent')
+                  }
                 >
                   {page.name}
                 </button>
@@ -152,27 +199,39 @@ export default function TaskChip({ task, index, onRemove, onUpdate, pages }: Tas
           )}
         </div>
 
-        {/* Priority pill */}
-        <span
+        {/* Priority pill — tappable, cycles P1 → P2 → P3 */}
+        <button
+          onClick={cyclePriority}
+          aria-label={`Priority ${priority} — tap to change`}
           style={{
             fontFamily: 'var(--font-mono)',
             fontSize: '10px',
             color: priorityStyle.text,
             backgroundColor: priorityStyle.bg,
-            border: `1px solid ${priorityStyle.text}`,
+            border: `1px solid ${priorityStyle.border}`,
             borderRadius: '4px',
-            padding: '2px 5px',
+            padding: '0 8px',
+            cursor: 'pointer',
+            minHeight: '44px',
+            minWidth: '44px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'background-color 100ms ease, color 100ms ease',
           }}
         >
-          {task.priority.toLowerCase()}
-        </span>
+          {priority.toLowerCase()}
+        </button>
 
         {/* Spacer */}
         <span style={{ flex: 1 }} />
 
         {/* Edit button */}
         <button
-          onClick={() => setIsEditing(true)}
+          onClick={(e) => {
+            e.stopPropagation()
+            setIsEditing(true)
+          }}
           style={{
             fontFamily: 'var(--font-mono)',
             fontSize: '10px',
@@ -188,7 +247,10 @@ export default function TaskChip({ task, index, onRemove, onUpdate, pages }: Tas
 
         {/* Remove button */}
         <button
-          onClick={() => onRemove(index)}
+          onClick={(e) => {
+            e.stopPropagation()
+            onRemove(index)
+          }}
           aria-label="Remove task"
           style={{
             fontFamily: 'var(--font-mono)',
