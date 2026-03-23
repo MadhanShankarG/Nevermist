@@ -17,6 +17,7 @@ import StatusPill from '@/components/StatusPill'
 import QuickChips from '@/components/QuickChips'
 import PreviewCard from '@/components/PreviewCard'
 import ConfirmationToast from '@/components/ConfirmationToast'
+import OfflineBanner from '@/components/OfflineBanner'
 
 // Stagger animation variants — each element animates in 600ms ease-out
 const makeVariant = (delayMs: number) => ({
@@ -438,6 +439,9 @@ export default function Home() {
         onCancel={handleCancelPreview}
         isSending={isSending}
       />
+
+      {/* ── Offline Banner (portal — above everything) ── */}
+      <OfflineBanner />
 
       {/* ── Confirmation Toast ── */}
       <ConfirmationToast

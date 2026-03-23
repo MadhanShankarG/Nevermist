@@ -1,5 +1,5 @@
 export interface QueueItem {
-  id: string
+  id?: number
   cleanedTask: string
   destinationPageId: string
   destinationName: string
@@ -9,8 +9,9 @@ export interface QueueItem {
   recurringPattern: string | null
   isUrl: boolean
   sourceUrl: string | null
+  status: 'pending' | 'failed' | 'needs-rerouting'
   createdAt: number
-  status: 'pending' | 'syncing' | 'failed'
+  error?: string
 }
 
 export interface FailedItem extends QueueItem {

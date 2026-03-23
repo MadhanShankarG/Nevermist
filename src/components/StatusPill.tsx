@@ -5,14 +5,22 @@ import { useQueueStore } from '@/store/queue'
 export default function StatusPill() {
   const isOnline = useQueueStore((s) => s.isOnline)
   const items = useQueueStore((s) => s.items)
-  const queuedCount = items.length
+  const needsReconnect = useQueueStore((s) => s.needsReconnect)
+  const isSyncing = useQueueStore((s) => s.isSyncing)
+  const queuedCount = items.filter((i) => i.status === 'pending').length
 
   let dotColor: string
   let label: string
 
-  if (!isOnline) {
+  if (needsReconnect) {
     dotColor = 'var(--amber)'
-    label = 'disconnected'
+    label = 'reconnect needed'
+  } else if (!isOnline) {
+    dotColor = 'var(--amber)'
+    label = queuedCount > 0 ? `${queuedCount} queued` : 'disconnected'
+  } else if (isSyncing) {
+    dotColor = 'var(--amber)'
+    label = 'syncing…'
   } else if (queuedCount > 0) {
     dotColor = 'var(--ink3)'
     label = `${queuedCount} queued`

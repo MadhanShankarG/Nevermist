@@ -3,6 +3,8 @@
 import { useCallback } from 'react'
 import { useCaptureStore } from '@/store/capture'
 import { usePreviewStore } from '@/store/preview'
+import { useQueueStore } from '@/store/queue'
+import { addToQueue, getAllQueued, removeFromQueue } from '@/lib/offline-queue'
 import type { CaptureResult } from '@/types/capture'
 
 export function useCapture() {
@@ -11,12 +13,43 @@ export function useCapture() {
   const setIsProcessing = useCaptureStore((s) => s.setIsProcessing)
   const setProcessingError = useCaptureStore((s) => s.setProcessingError)
   const setPreview = usePreviewStore((s) => s.setPreview)
+  const setIsOnline = useQueueStore((s) => s.setIsOnline)
+  const setItems = useQueueStore((s) => s.setItems)
 
   const submit = useCallback(async (imageData?: string | null) => {
     if (!inputValue.trim() && !imageData) return
 
     setIsProcessing(true)
     setProcessingError(null)
+
+    // Save to IndexedDB BEFORE any API call — capture is never lost
+    let queueId: number | null = null
+    try {
+      queueId = await addToQueue({
+        cleanedTask: inputValue,
+        destinationPageId: '',
+        destinationName: '',
+        priority: 'P2',
+        dueDate: null,
+        isRecurring: false,
+        recurringPattern: null,
+        isUrl: false,
+        sourceUrl: null,
+      })
+      // Sync store with IDB
+      const items = await getAllQueued()
+      setItems(items)
+    } catch {
+      // IDB failure — continue without queue safety net
+    }
+
+    // If offline: skip API call, keep item in queue
+    if (!navigator.onLine) {
+      setIsOnline(false)
+      setIsProcessing(false)
+      setProcessingError('You\'re offline — capture queued for later')
+      return
+    }
 
     try {
       const res = await fetch('/api/capture', {
@@ -35,12 +68,24 @@ export function useCapture() {
         throw new Error(data.error || 'Capture failed')
       }
 
+      // AI processing succeeded — remove from queue
+      // (the preview card handles Notion send; if that fails,
+      // the user can retry from the preview which is still visible)
+      if (queueId !== null) {
+        try {
+          await removeFromQueue(queueId)
+          const items = await getAllQueued()
+          setItems(items)
+        } catch {
+          // IDB failure — non-critical
+        }
+      }
+
       // Photo mode — array of tasks
       if (inputMode === 'photo' && Array.isArray(data.tasks)) {
         setPreview({
           visible: true,
           tasks: data.tasks as CaptureResult[],
-          // Seed first task fields into top-level for single-task fallback
           cleanedTask: data.tasks[0]?.cleanedTask ?? '',
           destinationPageId: data.tasks[0]?.destinationPageId ?? '',
           destinationName: data.tasks[0]?.destinationName ?? '',
@@ -69,12 +114,30 @@ export function useCapture() {
         })
       }
     } catch (err) {
+      // Network error — keep item in queue for offline sync
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        setIsOnline(false)
+        setProcessingError('Network lost — capture queued for later')
+        return
+      }
+
+      // Non-network error — remove from queue (item can't be processed)
+      if (queueId !== null) {
+        try {
+          await removeFromQueue(queueId)
+          const items = await getAllQueued()
+          setItems(items)
+        } catch {
+          // IDB failure — non-critical
+        }
+      }
+
       const message = err instanceof Error ? err.message : 'Something went wrong'
       setProcessingError(message)
     } finally {
       setIsProcessing(false)
     }
-  }, [inputValue, inputMode, setIsProcessing, setProcessingError, setPreview])
+  }, [inputValue, inputMode, setIsProcessing, setProcessingError, setPreview, setIsOnline, setItems])
 
   return { submit }
 }
