@@ -31,6 +31,7 @@ export function useOffline() {
   }, [setItems])
 
   const startSync = useCallback(async () => {
+    console.log('[useOffline] startSync fired — online:', navigator.onLine)
     if (isSyncingRef.current) return
     isSyncingRef.current = true
     setIsSyncing(true)

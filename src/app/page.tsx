@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { useCapture } from '@/hooks/useCapture'
+import { useOffline } from '@/hooks/useOffline'
 import { useCaptureStore } from '@/store/capture'
 import { usePreviewStore } from '@/store/preview'
 import { useUserStore } from '@/store/user'
-import { useQueueStore } from '@/store/queue'
+
 import CaptureInput from '@/components/CaptureInput'
 import SendButton from '@/components/SendButton'
 import VoiceButton from '@/components/VoiceButton'
@@ -67,7 +68,7 @@ export default function Home() {
   const setHasSeenTagline = useUserStore((s) => s.setHasSeenTagline)
   const setPages = useUserStore((s) => s.setPages)
 
-  const setIsOnline = useQueueStore((s) => s.setIsOnline)
+
 
   // Local state
   const [hasPages, setHasPages] = useState<boolean | null>(null)
@@ -87,7 +88,10 @@ export default function Home() {
   }, [setHasCompletedFirstCapture, setHasSeenTagline])
 
   // Hooks
-  const { submit } = useCapture()
+  const { submit, sendToNotion } = useCapture()
+  // Mount useOffline — registers online/offline listeners and triggers
+  // startSync() automatically when the browser comes back online.
+  useOffline()
 
   // Visual viewport — mobile keyboard
   useEffect(() => {
@@ -99,18 +103,6 @@ export default function Home() {
     window.visualViewport?.addEventListener('resize', updateViewport)
     return () => window.visualViewport?.removeEventListener('resize', updateViewport)
   }, [])
-
-  // Online/offline
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true)
-    const handleOffline = () => setIsOnline(false)
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-    return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
-  }, [setIsOnline])
 
   // Auth gate — check session + pages
   useEffect(() => {
@@ -151,58 +143,50 @@ export default function Home() {
   }, [inputValue, submit])
 
   // 2. Send confirmed preview to Notion
+  // Uses sendToNotion from useCapture which handles the queue:
+  //   addToQueue(result) → /api/notion/send → 200: removeFromQueue
+  //   On failure: item stays in queue for automatic sync via useOffline
   const handleNotionSend = useCallback(async () => {
     setIsSending(true)
-    try {
-      const isPhotoMode = preview.tasks.length > 0
 
-      const body = isPhotoMode
-        ? { tasks: preview.tasks }
-        : {
-            cleanedTask: preview.cleanedTask,
-            destinationPageId: preview.destinationPageId,
-            priority: preview.priority,
-            dueDate: preview.dueDate,
-            isRecurring: preview.isRecurring,
-            recurringPattern: preview.recurringPattern,
-            isUrl: preview.isUrl,
-            sourceUrl: preview.sourceUrl,
-          }
-
-      const res = await fetch('/api/notion/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-
-      if (!res.ok) {
-        const data = await res.json() as { error?: string }
-        throw new Error(data.error || 'Failed to send')
-      }
-
-      // Show toast immediately, reset input immediately
-      setToast({
-        destinationName: preview.destinationName,
-        priority: preview.priority,
-        dueDate: preview.dueDate,
-      })
-
-      // Card exits first, then reset
-      resetPreview()
-      resetCapture()
-
-      // First capture persistence
-      if (!hasCompletedFirstCapture) {
-        setHasCompletedFirstCapture(true)
-        localStorage.setItem('nevermist:firstCapture', 'true')
-      }
-    } catch (err) {
-      console.error('Notion send error:', err)
-    } finally {
-      setIsSending(false)
+    const result = {
+      cleanedTask: preview.cleanedTask,
+      destinationPageId: preview.destinationPageId,
+      destinationName: preview.destinationName,
+      priority: preview.priority,
+      dueDate: preview.dueDate,
+      isRecurring: preview.isRecurring,
+      recurringPattern: preview.recurringPattern,
+      isUrl: preview.isUrl,
+      sourceUrl: preview.sourceUrl,
     }
+
+    await sendToNotion(
+      result,
+      // onSuccess
+      (sent) => {
+        setToast({
+          destinationName: sent.destinationName,
+          priority: sent.priority,
+          dueDate: sent.dueDate,
+        })
+        resetPreview()
+        resetCapture()
+        if (!hasCompletedFirstCapture) {
+          setHasCompletedFirstCapture(true)
+          localStorage.setItem('nevermist:firstCapture', 'true')
+        }
+        setIsSending(false)
+      },
+      // onError
+      (message) => {
+        console.error('Notion send error:', message)
+        setIsSending(false)
+      },
+    )
   }, [
     preview,
+    sendToNotion,
     resetCapture,
     resetPreview,
     hasCompletedFirstCapture,
