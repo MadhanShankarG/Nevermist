@@ -1,7 +1,15 @@
 import type { NextConfig } from 'next'
+import withSerwistInit from '@serwist/next'
+
+const withSerwist = withSerwistInit({
+  swSrc: 'src/app/sw.ts',
+  swDest: 'public/sw.js',
+  cacheOnNavigation: true,
+  additionalPrecacheEntries: [{ url: '/', revision: null }],
+})
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 }
 
-export default nextConfig
+export default withSerwist(nextConfig)

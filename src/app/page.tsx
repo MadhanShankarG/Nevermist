@@ -47,6 +47,27 @@ interface ToastData {
   dueDate: string | null
 }
 
+// Small inline component — shows a brief success message when a capture
+// is queued offline, then calls onDone after 2 seconds.
+function OfflineQueuedMessage({ onDone }: { onDone: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onDone, 2000)
+    return () => clearTimeout(timer)
+  }, [onDone])
+
+  return (
+    <p
+      style={{
+        fontFamily: 'var(--font-sans)',
+        fontSize: '12px',
+        color: 'var(--ink3)',
+      }}
+    >
+      Captured — will process when back online
+    </p>
+  )
+}
+
 export default function Home() {
   const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
@@ -333,8 +354,8 @@ export default function Home() {
               <CaptureInput onSubmit={handleSubmit} />
             </motion.div>
 
-            {/* Processing error */}
-            {processingError && (
+            {/* Processing error / offline queued message */}
+            {processingError && processingError !== '__offline_queued__' && (
               <p
                 style={{
                   fontFamily: 'var(--font-mono)',
@@ -346,6 +367,13 @@ export default function Home() {
                 {processingError}
               </p>
             )}
+            {processingError === '__offline_queued__' && (
+              <OfflineQueuedMessage onDone={() => {
+                // Clear the sentinel after display — access store directly
+                useCaptureStore.getState().setProcessingError(null)
+              }} />
+            )}
+
 
             {/* InputActions row */}
             <motion.div

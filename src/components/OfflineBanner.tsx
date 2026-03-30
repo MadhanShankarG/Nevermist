@@ -19,8 +19,12 @@ export default function OfflineBanner() {
     setMounted(true)
   }, [])
 
-  const pendingCount = items.filter((i) => i.status === 'pending').length
+  // Item counts by status
+  const pendingAiCount = items.filter((i) => i.status === 'pending-ai').length
+  const pendingNotionCount = items.filter((i) => i.status === 'pending-notion').length
   const rerouteCount = items.filter((i) => i.status === 'needs-rerouting').length
+  // Total items the user has queued (regardless of stage)
+  const totalPending = pendingAiCount + pendingNotionCount
 
   // Determine which banner state to show
   let content: React.ReactNode = null
@@ -62,14 +66,17 @@ export default function OfflineBanner() {
         — destination page not found
       </span>
     )
-  } else if (!isOnline && pendingCount > 0) {
-    // State 1 — Offline with queued items
+  } else if (!isOnline && totalPending > 0) {
+    // State 4 (new) — Offline with queued thoughts (pending-ai or pending-notion)
     content = (
       <span>
-        {pendingCount} {pendingCount === 1 ? 'item' : 'items'} queued · will sync when
-        online
+        {totalPending} {totalPending === 1 ? 'thought' : 'thoughts'} captured — will
+        sync when back online
       </span>
     )
+  } else if (!isOnline && totalPending === 0) {
+    // State 1 — Offline, nothing queued (rare but valid)
+    content = <span>offline</span>
   }
 
   // Nothing to show

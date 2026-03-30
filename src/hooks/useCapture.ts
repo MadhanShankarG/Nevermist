@@ -26,24 +26,57 @@ export function useCapture() {
     }
   }, [setItems])
 
+  /** Normalise InputMode to the subset the queue supports */
+  const toQueueMode = (mode: string): 'text' | 'voice' | 'photo' =>
+    mode === 'photo' ? 'photo' : mode === 'voice' ? 'voice' : 'text'
+
   const submit = useCallback(async (imageData?: string | null) => {
     if (!inputValue.trim() && !imageData) return
 
-    // ── Step 1: If offline, skip entirely — AI hasn't processed it yet
-    // so there is nothing meaningful to queue.
+    // ─────────────────────────────────────────────────────────────────────
+    // OFFLINE PATH — WhatsApp-style instant feedback.
+    //   Save raw input as pending-ai, clear the input, show a brief
+    //   success message. AI + Notion happen silently in startSync().
+    // ─────────────────────────────────────────────────────────────────────
     if (!navigator.onLine) {
       setIsOnline(false)
-      setProcessingError("You're offline — capture when back online")
+
+      try {
+        await addToQueue({
+          rawInput: inputValue,
+          inputMode: toQueueMode(inputMode),
+          // Placeholder values — replaced by updateQueueItem() after Claude runs
+          cleanedTask: '',
+          destinationPageId: '',
+          destinationName: '',
+          priority: 'P3',
+          dueDate: null,
+          isRecurring: false,
+          recurringPattern: null,
+          isUrl: false,
+          sourceUrl: null,
+          status: 'pending-ai',
+          createdAt: Date.now(),
+          retryCount: 0,
+        })
+        await syncQueueStore()
+      } catch {
+        // IDB failure — still clear the field and show the message
+      }
+
+      resetCapture()
+      // Sentinel — page.tsx renders a friendly green message for 2 seconds
+      setProcessingError('__offline_queued__')
       return
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // ONLINE PATH — unchanged from Phase 9
+    // ─────────────────────────────────────────────────────────────────────
     setIsProcessing(true)
     setProcessingError(null)
 
-    let captureResult: CaptureResult | null = null
-
     try {
-      // ── Step 2: Call /api/capture for AI processing
       const res = await fetch('/api/capture', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -60,8 +93,7 @@ export function useCapture() {
         throw new Error(data.error || 'Capture failed')
       }
 
-      // ── Step 3: AI returned a CaptureResult — show preview card.
-      // For photo mode, use the first task for the preview header.
+      // Photo mode — array of tasks
       if (inputMode === 'photo' && Array.isArray(data.tasks)) {
         setPreview({
           visible: true,
@@ -77,45 +109,65 @@ export function useCapture() {
           sourceUrl: null,
         })
       } else {
-        // Text / voice / url — single result
-        captureResult = data as CaptureResult
+        const result = data as CaptureResult
         setPreview({
           visible: true,
-          cleanedTask: captureResult.cleanedTask,
-          destinationPageId: captureResult.destinationPageId,
-          destinationName: captureResult.destinationName,
-          priority: captureResult.priority,
-          dueDate: captureResult.dueDate,
-          isRecurring: captureResult.isRecurring,
-          recurringPattern: captureResult.recurringPattern,
-          isUrl: captureResult.isUrl,
-          sourceUrl: captureResult.sourceUrl,
+          cleanedTask: result.cleanedTask,
+          destinationPageId: result.destinationPageId,
+          destinationName: result.destinationName,
+          priority: result.priority,
+          dueDate: result.dueDate,
+          isRecurring: result.isRecurring,
+          recurringPattern: result.recurringPattern,
+          isUrl: result.isUrl,
+          sourceUrl: result.sourceUrl,
           tasks: [],
         })
       }
     } catch (err) {
-      // Network error during /api/capture — we cannot AI-process offline,
-      // so there is nothing to queue. Show a user-friendly message.
+      // Network dropped mid-request — queue raw input for later
       if (!navigator.onLine || (err instanceof TypeError && err.message.toLowerCase().includes('fetch'))) {
         setIsOnline(false)
-        setProcessingError("You're offline — capture when back online")
+
+        try {
+          await addToQueue({
+            rawInput: inputValue,
+            inputMode: toQueueMode(inputMode),
+            cleanedTask: '',
+            destinationPageId: '',
+            destinationName: '',
+            priority: 'P3',
+            dueDate: null,
+            isRecurring: false,
+            recurringPattern: null,
+            isUrl: false,
+            sourceUrl: null,
+            status: 'pending-ai',
+            createdAt: Date.now(),
+            retryCount: 0,
+          })
+          await syncQueueStore()
+        } catch {
+          // IDB failure — non-critical
+        }
+
+        resetCapture()
+        setProcessingError('__offline_queued__')
         return
       }
 
-      // Non-network error (e.g. 500, auth error) — no queue, just report
       const message = err instanceof Error ? err.message : 'Something went wrong'
       setProcessingError(message)
     } finally {
       setIsProcessing(false)
     }
-  }, [inputValue, inputMode, setIsProcessing, setProcessingError, setPreview, setIsOnline, syncQueueStore])
+  }, [inputValue, inputMode, setIsProcessing, setProcessingError, setPreview, setIsOnline, syncQueueStore, resetCapture])
 
-  // ── sendToNotion is called from page.tsx after the user confirms the
-  // preview card. We handle the queue here so the flow is:
-  //   AI result shown in preview → user taps Send →
-  //   addToQueue(result) → call /api/notion/send →
-  //   200: removeFromQueue → done
-  //   failure: item stays in queue for sync
+  // ─────────────────────────────────────────────────────────────────────
+  // sendToNotion — called from page.tsx after user confirms preview card.
+  //   addToQueue(pending-notion) → /api/notion/send → 200: removeFromQueue
+  //   On failure: item stays in queue for useOffline.startSync()
+  // ─────────────────────────────────────────────────────────────────────
   const sendToNotion = useCallback(async (
     result: CaptureResult,
     onSuccess: (result: CaptureResult) => void,
@@ -123,16 +175,29 @@ export function useCapture() {
   ) => {
     let queueId: number | null = null
 
-    // ── Step 3a: Save processed CaptureResult to queue
     try {
-      queueId = await addToQueue(result)
+      queueId = await addToQueue({
+        rawInput: result.cleanedTask,
+        inputMode: 'text',
+        cleanedTask: result.cleanedTask,
+        destinationPageId: result.destinationPageId,
+        destinationName: result.destinationName,
+        priority: result.priority,
+        dueDate: result.dueDate,
+        isRecurring: result.isRecurring,
+        recurringPattern: result.recurringPattern,
+        isUrl: result.isUrl,
+        sourceUrl: result.sourceUrl,
+        status: 'pending-notion',
+        createdAt: Date.now(),
+        retryCount: 0,
+      })
       await syncQueueStore()
     } catch {
-      // IDB failure — continue, worst case we lose resilience
+      // IDB failure — continue
     }
 
     try {
-      // ── Step 4: Call /api/notion/send with the processed result
       const res = await fetch('/api/notion/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -153,7 +218,7 @@ export function useCapture() {
         throw new Error(data.error || 'Failed to send to Notion')
       }
 
-      // ── Step 5: 200 success — remove from queue, notify caller
+      // 200 — remove from queue
       if (queueId !== null) {
         try {
           await removeFromQueue(queueId)
@@ -165,15 +230,10 @@ export function useCapture() {
 
       onSuccess(result)
     } catch (err) {
-      // ── Step 6: Network error or server error — item stays in queue
-      // useOffline.startSync() will re-send when back online.
       if (!navigator.onLine || (err instanceof TypeError && err.message.toLowerCase().includes('fetch'))) {
         setIsOnline(false)
       }
-
-      // Keep item in queue (do NOT call removeFromQueue) — sync will handle it
       await syncQueueStore()
-
       const message = err instanceof Error ? err.message : 'Send failed'
       onError(message)
     }

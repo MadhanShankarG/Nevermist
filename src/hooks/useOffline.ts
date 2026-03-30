@@ -5,9 +5,11 @@ import { useQueueStore } from '@/store/queue'
 import {
   getAllQueued,
   removeFromQueue,
+  updateQueueItem,
   markFailed,
   markNeedsRerouting,
 } from '@/lib/offline-queue'
+import type { CaptureResult } from '@/types/capture'
 
 const MAX_RETRIES = 3
 const BACKOFF_BASE_MS = 2000
@@ -37,37 +39,36 @@ export function useOffline() {
     setIsSyncing(true)
 
     try {
+      // getAllQueued() returns items sorted by createdAt ASC — FIFO
       const items = await getAllQueued()
-      const pending = items.filter((i) => i.status === 'pending')
+      const actionable = items.filter(
+        (i) => i.status === 'pending-ai' || i.status === 'pending-notion',
+      )
 
-      for (const item of pending) {
-        // Check we're still online before each item
+      for (const item of actionable) {
         if (!navigator.onLine) break
 
         const id = item.id!
 
-        let success = false
-        let retries = 0
+        // ──────────────────────────────────────────────────────────────
+        // PENDING-AI: call Claude, upgrade item in-place, then fall
+        //             through to Notion send immediately
+        // ──────────────────────────────────────────────────────────────
+        if (item.status === 'pending-ai') {
+          console.log('[useOffline] processing pending-ai item:', id, item.rawInput.slice(0, 40))
 
-        while (!success && retries <= MAX_RETRIES) {
+          let captureResult: CaptureResult | null = null
+
           try {
-            const res = await fetch('/api/queue/sync', {
+            const res = await fetch('/api/capture', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(item),
+              body: JSON.stringify({
+                inputValue: item.rawInput,
+                inputMode: item.inputMode,
+                imageData: null,
+              }),
             })
-
-            if (res.ok) {
-              await removeFromQueue(id)
-              await syncQueueToStore()
-              success = true
-              break
-            }
-
-            const data = (await res.json().catch(() => ({}))) as {
-              error?: string
-              retryable?: boolean
-            }
 
             if (res.status === 401) {
               // Auth revoked — stop entire sync
@@ -76,45 +77,57 @@ export function useOffline() {
               return
             }
 
-            if (res.status === 404) {
-              await markNeedsRerouting(id)
+            if (!res.ok) {
+              const errData = (await res.json().catch(() => ({}))) as { error?: string }
+              await markFailed(id, errData.error ?? `Capture failed (${res.status})`)
               await syncQueueToStore()
-              break
-            }
-
-            if (res.status === 429) {
-              // Rate limited — exponential backoff
-              const delay = BACKOFF_BASE_MS * Math.pow(2, retries)
-              await sleep(delay)
-              retries++
               continue
             }
 
-            // 500 or other server error — retry up to MAX_RETRIES
-            if (data.retryable !== false && retries < MAX_RETRIES) {
-              retries++
-              await sleep(BACKOFF_BASE_MS * retries)
-              continue
-            }
-
-            // Give up on this item
-            await markFailed(id, data.error ?? 'Send failed')
-            await syncQueueToStore()
-            break
+            const data = await res.json()
+            captureResult = data as CaptureResult
           } catch {
-            // Network drop mid-sync — stop, resume on next online event
+            // Network error while calling Claude
             if (!navigator.onLine) break
-            retries++
-            if (retries > MAX_RETRIES) {
-              await markFailed(id, 'Network error')
-              await syncQueueToStore()
-              break
-            }
-            await sleep(BACKOFF_BASE_MS * retries)
+            await markFailed(id, 'Network error during AI processing')
+            await syncQueueToStore()
+            continue
           }
+
+          // Upgrade item: pending-ai → pending-notion with Claude's result
+          try {
+            await updateQueueItem(id, {
+              status: 'pending-notion',
+              cleanedTask: captureResult.cleanedTask,
+              destinationPageId: captureResult.destinationPageId,
+              destinationName: captureResult.destinationName,
+              priority: captureResult.priority,
+              dueDate: captureResult.dueDate,
+              isRecurring: captureResult.isRecurring,
+              recurringPattern: captureResult.recurringPattern,
+              isUrl: captureResult.isUrl,
+              sourceUrl: captureResult.sourceUrl,
+            })
+          } catch {
+            // IDB write failed — skip to next item
+            continue
+          }
+
+          // Re-fetch the updated item so the notion-send block below has
+          // all fields populated
+          const updatedItems = await getAllQueued()
+          const upgraded = updatedItems.find((i) => i.id === id)
+          if (!upgraded || upgraded.status !== 'pending-notion') continue
+
+          // Fall through to notion send with the upgraded item
+          await sendItemToNotion(upgraded)
+        } else if (item.status === 'pending-notion') {
+          // ────────────────────────────────────────────────────────────
+          // PENDING-NOTION: existing logic — unchanged
+          // ────────────────────────────────────────────────────────────
+          await sendItemToNotion(item)
         }
 
-        // If we went offline mid-loop, stop
         if (!navigator.onLine) break
       }
     } finally {
@@ -122,7 +135,77 @@ export function useOffline() {
       setIsSyncing(false)
       await syncQueueToStore()
     }
-  }, [setIsSyncing, setNeedsReconnect, syncQueueToStore])
+
+    // ── Inner helper — send one pending-notion item to Notion ──────────
+    async function sendItemToNotion(item: Awaited<ReturnType<typeof getAllQueued>>[number]) {
+      const id = item.id!
+      let success = false
+      let retries = 0
+
+      while (!success && retries <= MAX_RETRIES) {
+        try {
+          const res = await fetch('/api/queue/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item),
+          })
+
+          if (res.ok) {
+            await removeFromQueue(id)
+            await syncQueueToStore()
+            success = true
+            break
+          }
+
+          const data = (await res.json().catch(() => ({}))) as {
+            error?: string
+            retryable?: boolean
+          }
+
+          if (res.status === 401) {
+            setNeedsReconnect(true)
+            await syncQueueToStore()
+            // Signal outer loop to stop
+            isSyncingRef.current = false
+            return
+          }
+
+          if (res.status === 404) {
+            await markNeedsRerouting(id)
+            await syncQueueToStore()
+            break
+          }
+
+          if (res.status === 429) {
+            const delay = BACKOFF_BASE_MS * Math.pow(2, retries)
+            await sleep(delay)
+            retries++
+            continue
+          }
+
+          // 500 or other server error — retry up to MAX_RETRIES
+          if (data.retryable !== false && retries < MAX_RETRIES) {
+            retries++
+            await sleep(BACKOFF_BASE_MS * retries)
+            continue
+          }
+
+          await markFailed(id, data.error ?? 'Send failed')
+          await syncQueueToStore()
+          break
+        } catch {
+          if (!navigator.onLine) return
+          retries++
+          if (retries > MAX_RETRIES) {
+            await markFailed(id, 'Network error')
+            await syncQueueToStore()
+            break
+          }
+          await sleep(BACKOFF_BASE_MS * retries)
+        }
+      }
+    }
+  }, [setIsSyncing, setNeedsReconnect, syncQueueToStore, setNeedsReconnect])
 
   useEffect(() => {
     // Initialize online state + load queue on mount

@@ -7,7 +7,9 @@ export default function StatusPill() {
   const items = useQueueStore((s) => s.items)
   const needsReconnect = useQueueStore((s) => s.needsReconnect)
   const isSyncing = useQueueStore((s) => s.isSyncing)
-  const queuedCount = items.filter((i) => i.status === 'pending').length
+  const queuedCount = items.filter(
+    (i) => i.status === 'pending-ai' || i.status === 'pending-notion',
+  ).length
 
   let dotColor: string
   let label: string
