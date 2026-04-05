@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-  "dev": "kill -9 $(lsof -ti:3000) 2>/dev/null; next dev -p 3000",
-  "build": "next build",
-  "start": "next start",
-  "lint": "next lint",
-  "db:push": "prisma db push",
-  "db:studio": "prisma studio",
-  "db:generate": "prisma generate"
-},
+    "dev": "kill -9 $(lsof -ti:3000) 2>/dev/null; next dev -p 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "db:generate": "prisma generate"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MadhanShankarG/Nevermist.git"
@@ -35,6 +35,7 @@
     "next": "^15.5.13",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "server-only": "^0.0.1",
     "web-push": "^3.6.7",
     "zustand": "^5.0.12"
   },

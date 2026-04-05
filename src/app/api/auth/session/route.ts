@@ -16,3 +16,11 @@ export async function GET() {
     userId: session.userId,
   })
 }
+
+// DELETE /api/auth/session — clears the session (disconnect / log out)
+export async function DELETE() {
+  const session = await getSession()
+  session.destroy()
+  return NextResponse.json({ success: true })
+}
+

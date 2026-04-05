@@ -1,14 +1,16 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
+import Link from 'next/link'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { useCapture } from '@/hooks/useCapture'
 import { useOffline } from '@/hooks/useOffline'
 import { useCaptureStore } from '@/store/capture'
 import { usePreviewStore } from '@/store/preview'
 import { useUserStore } from '@/store/user'
+import { isPushSupported, isIosSafariNotInstalled } from '@/lib/pwa'
 
 import CaptureInput from '@/components/CaptureInput'
 import SendButton from '@/components/SendButton'
@@ -68,6 +70,183 @@ function OfflineQueuedMessage({ onDone }: { onDone: () => void }) {
   )
 }
 
+// ── Nudge Prompt ─────────────────────────────────────────────────────────
+// Appears after the 3rd capture if push is supported and not yet dismissed.
+function NudgePrompt({
+  onDismiss,
+  onTimeSet,
+}: {
+  onDismiss: () => void
+  onTimeSet: (time: string) => void
+}) {
+  const [showPicker, setShowPicker] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const handleTimeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const time = e.target.value
+    if (!time) return
+    setSaving(true)
+    onTimeSet(time)
+    setSaving(false)
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.4, ease: [0, 0, 0.2, 1] }}
+      style={{
+        fontFamily: 'var(--font-sans)',
+        fontSize: '13px',
+        color: 'var(--ink2)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+      }}
+    >
+      {!showPicker ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={() => setShowPicker(true)}
+            onKeyDown={(e) => e.key === 'Enter' && setShowPicker(true)}
+            style={{ cursor: 'pointer' }}
+          >
+            Want a daily reminder to capture? Set a nudge time →
+          </span>
+          <button
+            onClick={onDismiss}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '10px',
+              color: 'var(--ink3)',
+              cursor: 'pointer',
+              padding: 0,
+              letterSpacing: '0.05em',
+            }}
+            aria-label="Dismiss nudge prompt"
+          >
+            dismiss
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ color: 'var(--ink3)', fontSize: '11px', fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>
+            nudge me at
+          </span>
+          <input
+            type="time"
+            autoFocus
+            disabled={saving}
+            onChange={handleTimeChange}
+            style={{
+              background: 'var(--bg3)',
+              border: '1px solid var(--line2)',
+              borderRadius: '6px',
+              padding: '4px 10px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '13px',
+              color: 'var(--ink)',
+              colorScheme: 'dark',
+            }}
+          />
+          <button
+            onClick={() => setShowPicker(false)}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '10px',
+              color: 'var(--ink3)',
+              cursor: 'pointer',
+              padding: 0,
+              letterSpacing: '0.05em',
+            }}
+          >
+            cancel
+          </button>
+        </div>
+      )}
+    </motion.div>
+  )
+}
+
+// ── iOS Install Banner ────────────────────────────────────────────────────
+function IosInstallBanner({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <motion.div
+      initial={{ y: '100%' }}
+      animate={{ y: 0 }}
+      exit={{ y: '100%' }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        background: 'var(--bg2)',
+        borderTop: '1px solid var(--line2)',
+        padding: '14px 20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '12px',
+        zIndex: 100,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* iOS share icon: upward arrow in a rounded-rect box */}
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 22 22"
+          fill="none"
+          aria-hidden="true"
+        >
+          <rect x="0.5" y="0.5" width="21" height="21" rx="5.5" stroke="var(--ink3)" />
+          <path
+            d="M11 14V7M11 7L8.5 9.5M11 7L13.5 9.5"
+            stroke="var(--ink2)"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <span
+          style={{
+            fontFamily: 'var(--font-sans)',
+            fontSize: '13px',
+            color: 'var(--ink2)',
+          }}
+        >
+          Add to Home Screen for the best experience
+        </span>
+      </div>
+      <button
+        onClick={onDismiss}
+        aria-label="Dismiss install banner"
+        style={{
+          background: 'none',
+          border: 'none',
+          fontFamily: 'var(--font-mono)',
+          fontSize: '10px',
+          color: 'var(--ink3)',
+          cursor: 'pointer',
+          padding: 0,
+          letterSpacing: '0.05em',
+          flexShrink: 0,
+        }}
+      >
+        dismiss
+      </button>
+    </motion.div>
+  )
+}
+
 export default function Home() {
   const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
@@ -88,8 +267,7 @@ export default function Home() {
   const setHasCompletedFirstCapture = useUserStore((s) => s.setHasCompletedFirstCapture)
   const setHasSeenTagline = useUserStore((s) => s.setHasSeenTagline)
   const setPages = useUserStore((s) => s.setPages)
-
-
+  const setNudgeTime = useUserStore((s) => s.setNudgeTime)
 
   // Local state
   const [hasPages, setHasPages] = useState<boolean | null>(null)
@@ -98,6 +276,20 @@ export default function Home() {
   const [isSending, setIsSending] = useState(false)
   const [toast, setToast] = useState<ToastData | null>(null)
 
+  // Capture count for nudge prompt (persisted in localStorage)
+  const [captureCount, setCaptureCount] = useState(0)
+
+  // Nudge prompt state
+  const [showNudgePrompt, setShowNudgePrompt] = useState(false)
+  const [nudgeDismissed, setNudgeDismissed] = useState(false)
+  const [pushSupported, setPushSupported] = useState(false)
+
+  // iOS install banner state
+  const [showIosBanner, setShowIosBanner] = useState(false)
+
+  // Ref to avoid showing nudge on subsequent toasts after it appears
+  const nudgeShownRef = useRef(false)
+
   // Hydrate persisted state from localStorage
   useEffect(() => {
     if (localStorage.getItem('nevermist:firstCapture') === 'true') {
@@ -105,6 +297,26 @@ export default function Home() {
     }
     if (localStorage.getItem('nevermist:seenTagline') === 'true') {
       setHasSeenTagline(true)
+    }
+
+    // Restore capture count
+    const storedCount = parseInt(localStorage.getItem('nevermist:captureCount') ?? '0', 10)
+    setCaptureCount(isNaN(storedCount) ? 0 : storedCount)
+
+    // Check if nudge prompt was dismissed
+    if (localStorage.getItem('nudgePromptDismissed') === 'true') {
+      setNudgeDismissed(true)
+    }
+
+    // Push capability (client-only check)
+    setPushSupported(isPushSupported())
+
+    // iOS install banner — show once if not dismissed and on iOS Safari
+    if (
+      localStorage.getItem('iosInstallDismissed') !== 'true' &&
+      isIosSafariNotInstalled()
+    ) {
+      setShowIosBanner(true)
     }
   }, [setHasCompletedFirstCapture, setHasSeenTagline])
 
@@ -164,9 +376,6 @@ export default function Home() {
   }, [inputValue, submit])
 
   // 2. Send confirmed preview to Notion
-  // Uses sendToNotion from useCapture which handles the queue:
-  //   addToQueue(result) → /api/notion/send → 200: removeFromQueue
-  //   On failure: item stays in queue for automatic sync via useOffline
   const handleNotionSend = useCallback(async () => {
     setIsSending(true)
 
@@ -197,6 +406,19 @@ export default function Home() {
           setHasCompletedFirstCapture(true)
           localStorage.setItem('nevermist:firstCapture', 'true')
         }
+
+        // Increment capture count and check for nudge prompt trigger
+        setCaptureCount((prev) => {
+          const next = prev + 1
+          localStorage.setItem('nevermist:captureCount', String(next))
+          // Show nudge prompt after 3rd capture (only once, only if supported)
+          if (next >= 3 && !nudgeShownRef.current && !nudgeDismissed && pushSupported) {
+            nudgeShownRef.current = true
+            setShowNudgePrompt(true)
+          }
+          return next
+        })
+
         setIsSending(false)
       },
       // onError
@@ -212,6 +434,8 @@ export default function Home() {
     resetPreview,
     hasCompletedFirstCapture,
     setHasCompletedFirstCapture,
+    nudgeDismissed,
+    pushSupported,
   ])
 
   // 3. Cancel preview — card slides down, input retains text
@@ -249,6 +473,53 @@ export default function Home() {
     if (chipId === 'voice-note') handleVoiceToggle()
     if (chipId === 'scan-notes') handleCameraCapture()
   }
+
+  // 9. Nudge prompt handlers
+  const handleNudgeDismiss = useCallback(() => {
+    setShowNudgePrompt(false)
+    setNudgeDismissed(true)
+    localStorage.setItem('nudgePromptDismissed', 'true')
+  }, [])
+
+  const handleNudgeTimeSet = useCallback(async (time: string) => {
+    setNudgeTime(time)
+    setShowNudgePrompt(false)
+
+    // Subscribe to push notifications
+    try {
+      const sw = await navigator.serviceWorker.ready
+      const existing = await sw.pushManager.getSubscription()
+      const subscription = existing ?? await sw.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+      })
+
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: subscription.toJSON() }),
+      })
+    } catch (err) {
+      console.error('[push] Subscription failed:', err)
+    }
+
+    // Save nudge time to DB via user config
+    try {
+      await fetch('/api/user/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nudgeTime: time }),
+      })
+    } catch (err) {
+      console.error('[nudge] Failed to save nudge time:', err)
+    }
+  }, [setNudgeTime])
+
+  // 10. iOS banner dismiss
+  const handleIosBannerDismiss = useCallback(() => {
+    setShowIosBanner(false)
+    localStorage.setItem('iosInstallDismissed', 'true')
+  }, [])
 
   // ── Render ──
 
@@ -462,6 +733,55 @@ export default function Home() {
         showTagline={!hasSeenTagline && hasCompletedFirstCapture}
         onTaglineDone={handleTaglineDone}
       />
+
+      {/* ── Nudge Prompt — appears after 3rd capture, below toast area ── */}
+      <AnimatePresence>
+        {showNudgePrompt && (
+          <div
+            style={{
+              position: 'fixed',
+              bottom: '80px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '100%',
+              maxWidth: '800px',
+              padding: '0 40px',
+              zIndex: 90,
+              boxSizing: 'border-box',
+            }}
+          >
+            <NudgePrompt
+              onDismiss={handleNudgeDismiss}
+              onTimeSet={handleNudgeTimeSet}
+            />
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── iOS Install Banner ── */}
+      <AnimatePresence>
+        {showIosBanner && (
+          <IosInstallBanner onDismiss={handleIosBannerDismiss} />
+        )}
+      </AnimatePresence>
+
+      {/* ── Settings trigger — DM Mono 10px, bottom-right ── */}
+      <Link
+        href="/settings"
+        style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '28px',
+          fontFamily: 'var(--font-mono)',
+          fontSize: '10px',
+          color: 'var(--ink3)',
+          letterSpacing: '0.08em',
+          textDecoration: 'none',
+          zIndex: 50,
+        }}
+      >
+        settings
+      </Link>
     </>
   )
 }

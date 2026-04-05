@@ -32,6 +32,11 @@ export const metadata: Metadata = {
     icon: '/icons/icon-192.png',
     apple: '/icons/icon-192.png',
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Nevermist',
+  },
 }
 
 export const viewport: Viewport = {
@@ -55,3 +60,4 @@ export default function RootLayout({
     </html>
   )
 }
+
