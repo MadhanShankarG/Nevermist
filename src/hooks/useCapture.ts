@@ -4,7 +4,7 @@ import { useCallback } from 'react'
 import { useCaptureStore } from '@/store/capture'
 import { usePreviewStore } from '@/store/preview'
 import { useQueueStore } from '@/store/queue'
-import { addToQueue, getAllQueued, removeFromQueue } from '@/lib/offline-queue'
+import { addToQueue, getAllQueued } from '@/lib/offline-queue'
 import type { CaptureResult } from '@/types/capture'
 
 export function useCapture() {
@@ -71,7 +71,7 @@ export function useCapture() {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // ONLINE PATH — unchanged from Phase 9
+    // ONLINE PATH — unchanged
     // ─────────────────────────────────────────────────────────────────────
     setIsProcessing(true)
     setProcessingError(null)
@@ -165,38 +165,23 @@ export function useCapture() {
 
   // ─────────────────────────────────────────────────────────────────────
   // sendToNotion — called from page.tsx after user confirms preview card.
-  //   addToQueue(pending-notion) → /api/notion/send → 200: removeFromQueue
-  //   On failure: item stays in queue for useOffline.startSync()
+  //
+  // FIX: fetch FIRST, queue ONLY on failure.
+  //
+  // Old (broken) flow:
+  //   addToQueue(pending-notion) → fetch → 200 → removeFromQueue
+  //   Race: startSync() sees the queue item while fetch is in-flight → duplicate
+  //
+  // New (correct) flow:
+  //   fetch /api/notion/send → 200 → onSuccess (queue never touched)
+  //                          → network error → addToQueue(pending-notion)
+  //                            startSync() will send it when back online
   // ─────────────────────────────────────────────────────────────────────
   const sendToNotion = useCallback(async (
     result: CaptureResult,
     onSuccess: (result: CaptureResult) => void,
     onError: (message: string) => void,
   ) => {
-    let queueId: number | null = null
-
-    try {
-      queueId = await addToQueue({
-        rawInput: result.cleanedTask,
-        inputMode: 'text',
-        cleanedTask: result.cleanedTask,
-        destinationPageId: result.destinationPageId,
-        destinationName: result.destinationName,
-        priority: result.priority,
-        dueDate: result.dueDate,
-        isRecurring: result.isRecurring,
-        recurringPattern: result.recurringPattern,
-        isUrl: result.isUrl,
-        sourceUrl: result.sourceUrl,
-        status: 'pending-notion',
-        createdAt: Date.now(),
-        retryCount: 0,
-      })
-      await syncQueueStore()
-    } catch {
-      // IDB failure — continue
-    }
-
     try {
       const res = await fetch('/api/notion/send', {
         method: 'POST',
@@ -218,21 +203,42 @@ export function useCapture() {
         throw new Error(data.error || 'Failed to send to Notion')
       }
 
-      // 200 — remove from queue
-      if (queueId !== null) {
-        try {
-          await removeFromQueue(queueId)
-          await syncQueueStore()
-        } catch {
-          // IDB failure — non-critical
-        }
-      }
-
+      // 200 — Notion confirmed the write. Queue is never involved.
       onSuccess(result)
     } catch (err) {
+      // ── Network / connectivity drop — queue the item for startSync() to
+      // send later. The fetch already failed so there is no duplicate risk.
       if (!navigator.onLine || (err instanceof TypeError && err.message.toLowerCase().includes('fetch'))) {
         setIsOnline(false)
+
+        try {
+          await addToQueue({
+            rawInput: result.cleanedTask,
+            inputMode: 'text',
+            cleanedTask: result.cleanedTask,
+            destinationPageId: result.destinationPageId,
+            destinationName: result.destinationName,
+            priority: result.priority,
+            dueDate: result.dueDate,
+            isRecurring: result.isRecurring,
+            recurringPattern: result.recurringPattern,
+            isUrl: result.isUrl,
+            sourceUrl: result.sourceUrl,
+            status: 'pending-notion',
+            createdAt: Date.now(),
+            retryCount: 0,
+          })
+          await syncQueueStore()
+        } catch {
+          // IDB failure — item is lost, but no duplicate will occur
+        }
+
+        // Don't call onError — the banner shows the queued count.
+        // The user sees it as "queued", not "failed".
+        return
       }
+
+      // Non-network error (e.g. 400, 500) — report to caller, no queue
       await syncQueueStore()
       const message = err instanceof Error ? err.message : 'Send failed'
       onError(message)

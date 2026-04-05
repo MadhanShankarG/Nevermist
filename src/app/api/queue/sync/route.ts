@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
         cleanedTask: item.cleanedTask,
         destinationPageId: item.destinationPageId,
         priority: item.priority,
-        dueDate: item.dueDate,
+        dueDate: item.dueDate ?? null,
         isUrl: item.isUrl ?? false,
         sourceUrl: item.sourceUrl ?? null,
       },

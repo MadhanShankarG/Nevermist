@@ -205,7 +205,7 @@ export function useOffline() {
         }
       }
     }
-  }, [setIsSyncing, setNeedsReconnect, syncQueueToStore, setNeedsReconnect])
+  }, [setIsSyncing, setNeedsReconnect, syncQueueToStore])
 
   useEffect(() => {
     // Initialize online state + load queue on mount
@@ -223,10 +223,18 @@ export function useOffline() {
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
 
-    // If already online and there are items, sync on mount
-    if (navigator.onLine) {
-      startSync()
-    }
+    // Only sync on mount if there are actually pending items in the queue.
+    // A normal page load with an empty queue does nothing.
+    getAllQueued().then((items) => {
+      const hasPending = items.some(
+        (i) => i.status === 'pending-ai' || i.status === 'pending-notion',
+      )
+      if (hasPending && navigator.onLine) {
+        startSync()
+      }
+    }).catch(() => {
+      // IDB read failure — skip mount-time sync
+    })
 
     return () => {
       window.removeEventListener('online', handleOnline)
