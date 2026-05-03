@@ -6,7 +6,10 @@ const withSerwist = withSerwistInit({
   swDest: 'public/sw.js',
   // Cache app shell only — small cache to avoid iOS eviction
   cacheOnNavigation: true,
-  additionalPrecacheEntries: [{ url: '/', revision: null }],
+  additionalPrecacheEntries: [
+    { url: '/', revision: null },
+    { url: '/connect', revision: null },
+  ],
 })
 
 const nextConfig: NextConfig = {
