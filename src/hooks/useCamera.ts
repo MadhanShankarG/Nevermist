@@ -83,6 +83,8 @@ export function useCamera(): UseCameraReturn {
         destinationName: tasks[0]?.destinationName ?? '',
         priority: tasks[0]?.priority ?? 'P2',
         dueDate: tasks[0]?.dueDate ?? null,
+        dueTime: tasks[0]?.dueTime ?? null,
+        duration: tasks[0]?.duration ?? 0,
         isRecurring: tasks[0]?.isRecurring ?? false,
         recurringPattern: tasks[0]?.recurringPattern ?? null,
         isUrl: false,

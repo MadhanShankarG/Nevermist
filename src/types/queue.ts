@@ -26,6 +26,8 @@ export interface QueueItem {
   destinationName: string                   // '' for pending-ai
   priority: 'P1' | 'P2' | 'P3'            // default 'P3' for pending-ai
   dueDate: string | null
+  dueTime: string | null                    // "HH:MM" 24-hour or null
+  duration: number                          // minutes, 0 if no time
   isRecurring: boolean
   recurringPattern: string | null
   isUrl: boolean

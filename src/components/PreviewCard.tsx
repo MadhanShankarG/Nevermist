@@ -282,6 +282,90 @@ export default function PreviewCard({ onSend, onCancel, isSending }: PreviewCard
                         />
                       </button>
                     </div>
+
+                    {/* ── Time + duration row — only shown when dueTime is set ── */}
+                    {preview.dueTime !== null && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '11px',
+                            color: 'var(--ink3)',
+                            letterSpacing: '0.04em',
+                          }}
+                        >
+                          time
+                        </span>
+                        <input
+                          id="preview-time-input"
+                          type="time"
+                          value={preview.dueTime ?? ''}
+                          onChange={(e) =>
+                            preview.setPreview({ dueTime: e.target.value || null })
+                          }
+                          style={{
+                            background: 'var(--bg4)',
+                            border: '1px solid var(--line2)',
+                            borderRadius: '6px',
+                            padding: '3px 8px',
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '11px',
+                            color: 'var(--ink2)',
+                            colorScheme: 'dark',
+                            outline: 'none',
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '11px',
+                            color: 'var(--ink3)',
+                            letterSpacing: '0.04em',
+                          }}
+                        >
+                          for
+                        </span>
+                        <input
+                          id="preview-duration-input"
+                          type="number"
+                          min={0}
+                          step={15}
+                          value={preview.duration}
+                          onChange={(e) =>
+                            preview.setPreview({
+                              duration: Math.max(0, parseInt(e.target.value, 10) || 0),
+                            })
+                          }
+                          style={{
+                            background: 'var(--bg4)',
+                            border: '1px solid var(--line2)',
+                            borderRadius: '6px',
+                            padding: '3px 8px',
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '11px',
+                            color: 'var(--ink2)',
+                            width: '60px',
+                            outline: 'none',
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '11px',
+                            color: 'var(--ink3)',
+                          }}
+                        >
+                          min
+                        </span>
+                      </div>
+                    )}
                   </>
                 )}
 

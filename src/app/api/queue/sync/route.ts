@@ -59,6 +59,8 @@ export async function POST(request: NextRequest) {
         destinationPageId: item.destinationPageId,
         priority: item.priority,
         dueDate: item.dueDate ?? null,
+        dueTime: item.dueTime ?? null,
+        duration: item.duration ?? 0,
         isUrl: item.isUrl ?? false,
         sourceUrl: item.sourceUrl ?? null,
       },

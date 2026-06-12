@@ -5,6 +5,8 @@ export interface SingleTaskPayload {
   destinationPageId: string
   priority: 'P1' | 'P2' | 'P3'
   dueDate: string | null
+  dueTime: string | null        // "HH:MM" 24-hour or null
+  duration: number              // minutes, 0 if no time
   isUrl?: boolean
   sourceUrl?: string | null
 }
@@ -22,6 +24,18 @@ function formatDueDateDisplay(dueDate: string): string {
       ? { month: 'short', day: 'numeric' }
       : { month: 'short', day: 'numeric', year: 'numeric' }
   return d.toLocaleDateString('en-US', opts)
+}
+
+/**
+ * Compute end time string given a start time and duration in minutes.
+ * Handles day overflow (e.g. 23:00 + 90min = 00:30 next day — capped at 23:59).
+ */
+function getEndTime(startTime: string, duration: number): string {
+  const [hours, mins] = startTime.split(':').map(Number)
+  const totalMins = hours * 60 + mins + duration
+  const endHours = Math.floor(totalMins / 60) % 24
+  const endMins = totalMins % 60
+  return `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`
 }
 
 export async function sendSingleTask(
@@ -75,7 +89,15 @@ export async function sendSingleTask(
     }
 
     if (hasDueDateProp && task.dueDate) {
-      properties[dueDatePropName] = { date: { start: task.dueDate } }
+      const dateValue = task.dueTime
+        ? {
+            start: `${task.dueDate}T${task.dueTime}:00`,
+            end: task.duration > 0
+              ? `${task.dueDate}T${getEndTime(task.dueTime, task.duration)}:00`
+              : undefined,
+          }
+        : { start: task.dueDate }
+      properties[dueDatePropName] = { date: dateValue }
     }
 
     if (hasStatusProp) {
@@ -106,11 +128,14 @@ export async function sendSingleTask(
     ]
 
     if (task.dueDate) {
+      const timeLabel = task.dueTime
+        ? ` at ${task.dueTime}${task.duration > 0 ? ` (${task.duration}m)` : ''}`
+        : ''
       metaRichText.push(
         { type: 'text', text: { content: '  ·  ' } },
         {
           type: 'text',
-          text: { content: `Due ${formatDueDateDisplay(task.dueDate)}` },
+          text: { content: `Due ${formatDueDateDisplay(task.dueDate)}${timeLabel}` },
           annotations: { color: 'gray' },
         },
       )

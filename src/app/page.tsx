@@ -392,6 +392,8 @@ export default function Home() {
       destinationName: preview.destinationName,
       priority: preview.priority,
       dueDate: preview.dueDate,
+      dueTime: preview.dueTime,
+      duration: preview.duration,
       isRecurring: preview.isRecurring,
       recurringPattern: preview.recurringPattern,
       isUrl: preview.isUrl,

@@ -8,6 +8,8 @@ interface PreviewState {
   destinationName: string
   priority: 'P1' | 'P2' | 'P3'
   dueDate: string | null
+  dueTime: string | null
+  duration: number
   isRecurring: boolean
   recurringPattern: string | null
   isUrl: boolean
@@ -27,6 +29,8 @@ const initialState: PreviewState = {
   destinationName: '',
   priority: 'P2',
   dueDate: null,
+  dueTime: null,
+  duration: 0,
   isRecurring: false,
   recurringPattern: null,
   isUrl: false,

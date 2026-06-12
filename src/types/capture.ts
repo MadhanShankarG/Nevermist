@@ -4,6 +4,8 @@ export interface CaptureResult {
   destinationName: string
   priority: 'P1' | 'P2' | 'P3'
   dueDate: string | null
+  dueTime: string | null        // "HH:MM" 24-hour, e.g. "08:00", "17:30". null if no time.
+  duration: number              // minutes. 0 if no time specified. e.g. 90 for "1.5 hours"
   isRecurring: boolean
   recurringPattern: string | null
   isUrl: boolean

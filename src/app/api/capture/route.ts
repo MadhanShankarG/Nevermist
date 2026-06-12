@@ -12,6 +12,8 @@ const REQUIRED_FIELDS: (keyof CaptureResult)[] = [
   'destinationName',
   'priority',
   'dueDate',
+  'dueTime',
+  'duration',
   'isRecurring',
   'recurringPattern',
   'isUrl',

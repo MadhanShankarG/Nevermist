@@ -26,6 +26,8 @@ Return a single JSON object:
   "destinationName": string,
   "priority": "P1" | "P2" | "P3",
   "dueDate": string | null,
+  "dueTime": "HH:MM" (24-hour) | null,
+  "duration": integer (minutes, 0 if no time),
   "isRecurring": boolean,
   "recurringPattern": string | null,
   "isUrl": boolean,
@@ -44,6 +46,8 @@ Return a JSON array — one object per extracted task:
     "destinationName": string,
     "priority": "P1" | "P2" | "P3",
     "dueDate": string | null,
+    "dueTime": "HH:MM" (24-hour) | null,
+    "duration": integer (minutes, 0 if no time),
     "isRecurring": boolean,
     "recurringPattern": string | null,
     "isUrl": false,
@@ -92,6 +96,19 @@ dueDate
   - "this week" = nearest Friday, "next week" = following Monday
   - "end of month" = last day of current month
   - When ambiguous ("next Friday" on a Friday) — always choose the future date
+
+dueTime
+  - Extract specific clock times from natural language
+  - Return "HH:MM" in 24-hour format — always zero-padded: "08:00", "17:30"
+  - "at 8am" → "08:00" | "at 5pm" → "17:00" | "at 2:30pm" → "14:30"
+  - Return null if no specific time is mentioned ("tomorrow morning", "next week" are too vague)
+  - Only return a time if the user stated an actual clock time
+
+duration
+  - The length of the event/block in minutes
+  - Default 60 if a specific time (dueTime) is present and no duration is stated
+  - "for 2 hours" → 120 | "for 30 minutes" → 30 | "for 1.5 hours" → 90
+  - Return 0 if dueTime is null (no time = no duration block)
 
 isRecurring
   - true if input contains: "every", "daily", "weekly", "each", "every monday",
@@ -145,6 +162,8 @@ Output:
   "destinationName": "Personal",
   "priority": "P2",
   "dueDate": "2026-03-31",
+  "dueTime": null,
+  "duration": 0,
   "isRecurring": false,
   "recurringPattern": null,
   "isUrl": false,
@@ -159,6 +178,8 @@ Output:
   "destinationName": "Work tasks",
   "priority": "P2",
   "dueDate": null,
+  "dueTime": "09:00",
+  "duration": 60,
   "isRecurring": true,
   "recurringPattern": "every monday",
   "isUrl": false,
@@ -173,6 +194,40 @@ Output:
   "destinationName": "Work tasks",
   "priority": "P1",
   "dueDate": "2026-03-17",
+  "dueTime": null,
+  "duration": 0,
+  "isRecurring": false,
+  "recurringPattern": null,
+  "isUrl": false,
+  "sourceUrl": null
+}
+
+Input: "yoga tomorrow at 6pm for 90 min"
+Output:
+{
+  "cleanedTask": "Yoga session",
+  "destinationPageId": "abc-123",
+  "destinationName": "Personal",
+  "priority": "P2",
+  "dueDate": "2026-06-13",
+  "dueTime": "18:00",
+  "duration": 90,
+  "isRecurring": false,
+  "recurringPattern": null,
+  "isUrl": false,
+  "sourceUrl": null
+}
+
+Input: "write a test on Monday at 8am"
+Output:
+{
+  "cleanedTask": "Write the test",
+  "destinationPageId": "def-456",
+  "destinationName": "Work tasks",
+  "priority": "P2",
+  "dueDate": "2026-06-15",
+  "dueTime": "08:00",
+  "duration": 60,
   "isRecurring": false,
   "recurringPattern": null,
   "isUrl": false,

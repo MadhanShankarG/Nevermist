@@ -11,6 +11,8 @@ interface SendBody {
   destinationPageId: string
   priority: 'P1' | 'P2' | 'P3'
   dueDate: string | null
+  dueTime: string | null
+  duration: number
   isRecurring: boolean
   recurringPattern: string | null
   isUrl: boolean
@@ -20,6 +22,8 @@ interface SendBody {
     destinationPageId: string
     priority: 'P1' | 'P2' | 'P3'
     dueDate: string | null
+    dueTime: string | null
+    duration: number
   }>
 }
 
@@ -55,7 +59,11 @@ export async function POST(request: NextRequest) {
         if (!pageConfig) continue
 
         try {
-          const url = await sendSingleTask(notion, { ...task, isUrl: false, sourceUrl: null }, pageConfig)
+          const url = await sendSingleTask(
+            notion,
+            { ...task, dueTime: task.dueTime ?? null, duration: task.duration ?? 0, isUrl: false, sourceUrl: null },
+            pageConfig,
+          )
           if (url) results.push(url)
         } catch (taskErr) {
           console.error('Failed to send task in batch:', task.cleanedTask, taskErr)
@@ -85,6 +93,8 @@ export async function POST(request: NextRequest) {
         destinationPageId: body.destinationPageId,
         priority: body.priority,
         dueDate: body.dueDate,
+        dueTime: body.dueTime,
+        duration: body.duration,
         isUrl: body.isUrl,
         sourceUrl: body.sourceUrl,
       },
