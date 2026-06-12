@@ -40,12 +40,13 @@ export default function SendButton({ onSend, disabled = false }: SendButtonProps
             letterSpacing: '0.1em',
             borderRadius: '20px',
             border: 'none',
-            cursor: isDisabled ? 'not-allowed' : 'pointer',
+            cursor: isDisabled ? 'default' : 'pointer',
             whiteSpace: 'nowrap',
             flexShrink: 0,
-            opacity: isDisabled ? 0.4 : 1,
+            opacity: isDisabled ? 0.2 : 1,
+            filter: isDisabled ? 'grayscale(1)' : 'none',
             pointerEvents: isDisabled ? 'none' : 'auto',
-            transition: 'background-color 150ms ease, opacity 150ms ease',
+            transition: 'background-color 150ms ease, opacity 150ms ease, filter 150ms ease',
           }}
           onMouseEnter={(e) => {
             if (!isDisabled) e.currentTarget.style.backgroundColor = 'var(--accent)'

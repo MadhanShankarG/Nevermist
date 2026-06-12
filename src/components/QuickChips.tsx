@@ -10,20 +10,20 @@ interface QuickChipsProps {
 }
 
 // ── Icons ───────────────────────────────────────────────────────────────────
-function BrainIcon() {
+function ClockIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
-      <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>
-      <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/>
+      <circle cx="12" cy="12" r="10"/>
+      <polyline points="12 6 12 12 16 14"/>
     </svg>
   )
 }
 
-function AddPageIcon() {
+function PageIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 5v14M5 12h14"/>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
     </svg>
   )
 }
@@ -55,14 +55,12 @@ function ScanIcon() {
 export default function QuickChips({ onChipClick }: QuickChipsProps) {
   const pages = useUserStore((s) => s.pages)
   const firstPageName = pages[0]?.name || 'Inbox'
-  const firstPageId = pages[0]?.notionPageId || ''
 
-  const setInputValue = useCaptureStore((s) => s.setInputValue)
   const setInputMode = useCaptureStore((s) => s.setInputMode)
 
   const voice = useVoice()
 
-  // State for 200ms accent flash on tap
+  // 200ms accent flash on tap
   const [activeChip, setActiveChip] = useState<string | null>(null)
   // Voice unsupported inline message
   const [voiceUnsupported, setVoiceUnsupported] = useState(false)
@@ -77,15 +75,13 @@ export default function QuickChips({ onChipClick }: QuickChipsProps) {
     onChipClick?.(chipId)
   }, [onChipClick])
 
-  const handleBrainDump = useCallback(() => {
-    flashAndRun('brain-dump', () => {
-      // Focus textarea and set a temporary placeholder override via input value hint
-      // We focus by querying the known textarea id
+  // ── Set a time: focuses input with time-oriented placeholder ──────────────
+  const handleSetTime = useCallback(() => {
+    flashAndRun('set-time', () => {
       const textarea = document.getElementById('capture-input') as HTMLTextAreaElement | null
       if (textarea) {
         textarea.focus()
-        textarea.placeholder = 'Dump everything on your mind...'
-        // Clear placeholder override on first keystroke
+        textarea.placeholder = 'e.g. call dentist Friday at 3pm'
         const clearPlaceholder = () => {
           textarea.placeholder = ''
           textarea.removeEventListener('input', clearPlaceholder)
@@ -95,21 +91,15 @@ export default function QuickChips({ onChipClick }: QuickChipsProps) {
     })
   }, [flashAndRun])
 
-  const handleAddToPage = useCallback(() => {
-    flashAndRun('add-to-page', () => {
-      if (firstPageId) {
-        useCaptureStore.getState().setInputValue(useCaptureStore.getState().inputValue)
-        // Pre-select destination — store destinationPageId in capture store
-        // We expose it via a direct state set since it's only used by the AI submit path
-        // The capture store doesn't have destinationPageId; we signal it via inputMode metadata
-        // Instead: focus input and let user type, but set the page in previewStore default
-        // The simplest correct approach: focus input
-      }
+  // ── Current page: focus input (page pre-selection happens via AI routing) ─
+  const handleCurrentPage = useCallback(() => {
+    flashAndRun('current-page', () => {
       const textarea = document.getElementById('capture-input') as HTMLTextAreaElement | null
       textarea?.focus()
     })
-  }, [flashAndRun, firstPageId])
+  }, [flashAndRun])
 
+  // ── Voice ─────────────────────────────────────────────────────────────────
   const handleVoice = useCallback(() => {
     if (!voice.isSupported) {
       flashAndRun('voice-note', () => {
@@ -129,18 +119,23 @@ export default function QuickChips({ onChipClick }: QuickChipsProps) {
     })
   }, [flashAndRun, voice, setInputMode])
 
+  // ── Scan: set photo mode then click camera input ──────────────────────────
   const handleScan = useCallback(() => {
     flashAndRun('scan-notes', () => {
       setInputMode('photo')
-      // Trigger camera button programmatically
       const cameraInput = document.getElementById('camera-input') as HTMLInputElement | null
       cameraInput?.click()
     })
   }, [flashAndRun, setInputMode])
 
-  const chips = [
-    { id: 'brain-dump', icon: <BrainIcon />, label: 'Quick brain dump', onClick: handleBrainDump },
-    { id: 'add-to-page', icon: <AddPageIcon />, label: `Add to ${firstPageName}`, onClick: handleAddToPage },
+  // ── Chip definitions ──────────────────────────────────────────────────────
+  type ChipDef =
+    | { id: string; icon: React.ReactNode; label: string; sublabel?: undefined; onClick: () => void }
+    | { id: string; icon: React.ReactNode; label: string; sublabel: string; onClick: () => void }
+
+  const chips: ChipDef[] = [
+    { id: 'set-time', icon: <ClockIcon />, label: 'Set a time', onClick: handleSetTime },
+    { id: 'current-page', icon: <PageIcon />, label: firstPageName, sublabel: 'current page', onClick: handleCurrentPage },
     { id: 'voice-note', icon: <MicIcon />, label: 'Record a voice note', onClick: handleVoice },
     { id: 'scan-notes', icon: <ScanIcon />, label: 'Scan handwritten notes', onClick: handleScan },
   ]
@@ -170,7 +165,7 @@ export default function QuickChips({ onChipClick }: QuickChipsProps) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '10px 11px',
+                padding: chip.sublabel ? '8px 11px' : '10px 11px',
                 backgroundColor: 'var(--bg3)',
                 border: `1px solid ${isActive ? 'var(--accent)' : 'var(--line2)'}`,
                 borderRadius: '10px',
@@ -196,16 +191,45 @@ export default function QuickChips({ onChipClick }: QuickChipsProps) {
               <span style={{ flexShrink: 0, color: isActive ? 'var(--accent)' : 'var(--ink2)' }}>
                 {chip.icon}
               </span>
-              <span
-                style={{
-                  fontFamily: 'var(--font-sans)',
-                  fontSize: '11px',
-                  color: 'var(--ink2)',
-                  lineHeight: 1.3,
-                }}
-              >
-                {chip.label}
-              </span>
+              {chip.sublabel ? (
+                <span style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-sans)',
+                      fontSize: '11px',
+                      color: 'var(--ink)',
+                      lineHeight: 1.3,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {chip.label}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '9px',
+                      color: 'var(--ink3)',
+                      letterSpacing: '0.04em',
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {chip.sublabel}
+                  </span>
+                </span>
+              ) : (
+                <span
+                  style={{
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: '11px',
+                    color: 'var(--ink2)',
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {chip.label}
+                </span>
+              )}
             </button>
           )
         })}

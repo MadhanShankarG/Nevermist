@@ -25,20 +25,27 @@ export function useCamera(): UseCameraReturn {
   const capturePhoto = useCallback(async () => {
     setError(null)
 
-    // Open file picker / camera first — before setting any store state
+    // Set photo mode immediately — before any async work — so the store
+    // reflects the correct mode if anything reads it during the flow
+    setInputMode('photo')
+
+    // Open file picker / camera first — before setting processing indicators
     // (avoids showing a processing indicator before the user has picked a photo)
     let file: File
     try {
       file = await openCamera()
     } catch (err) {
-      // User cancelled — silently ignore
-      if (err instanceof Error && err.message === 'cancelled') return
+      // User cancelled — reset mode and silently ignore
+      if (err instanceof Error && err.message === 'cancelled') {
+        setInputMode('text')
+        return
+      }
       setError(err instanceof Error ? err.message : 'Camera unavailable')
+      setInputMode('text')
       return
     }
 
     setIsCapturing(true)
-    setInputMode('photo')
     setIsProcessing(true)
     setProcessingError(null)
 
