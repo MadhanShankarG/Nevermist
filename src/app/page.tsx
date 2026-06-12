@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { useCapture } from '@/hooks/useCapture'
@@ -21,6 +20,7 @@ import QuickChips from '@/components/QuickChips'
 import PreviewCard from '@/components/PreviewCard'
 import ConfirmationToast from '@/components/ConfirmationToast'
 import OfflineBanner from '@/components/OfflineBanner'
+import SettingsPage from '@/app/settings/page'
 
 // Stagger animation variants — each element animates in 600ms ease-out
 const makeVariant = (delayMs: number) => ({
@@ -268,6 +268,7 @@ export default function Home() {
   const setHasSeenTagline = useUserStore((s) => s.setHasSeenTagline)
   const setPages = useUserStore((s) => s.setPages)
   const setNudgeTime = useUserStore((s) => s.setNudgeTime)
+  const setSettingsOpen = useUserStore((s) => s.setSettingsOpen)
 
   // Local state
   const [hasPages, setHasPages] = useState<boolean | null>(null)
@@ -317,6 +318,12 @@ export default function Home() {
       isIosSafariNotInstalled()
     ) {
       setShowIosBanner(true)
+    }
+
+    // Restore theme from localStorage
+    const savedTheme = localStorage.getItem('nevermist-theme') as 'dark' | 'light' | null
+    if (savedTheme === 'light') {
+      useUserStore.getState().setTheme('light')
     }
   }, [setHasCompletedFirstCapture, setHasSeenTagline])
 
@@ -765,23 +772,50 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      {/* ── Settings trigger — DM Mono 10px, bottom-right ── */}
-      <Link
-        href="/settings"
+      {/* ── Settings trigger — gear icon + text, bottom-right ── */}
+      <button
+        id="settings-trigger"
+        onClick={() => setSettingsOpen(true)}
+        aria-label="Open settings"
         style={{
           position: 'fixed',
           bottom: '20px',
           right: '28px',
-          fontFamily: 'var(--font-mono)',
-          fontSize: '10px',
-          color: 'var(--ink3)',
-          letterSpacing: '0.08em',
-          textDecoration: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
           zIndex: 50,
+          color: 'var(--ink3)',
+          transition: 'color 150ms ease',
+          padding: '8px',
+          margin: '-8px',
         }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--ink2)' }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--ink3)' }}
       >
-        settings
-      </Link>
+        {/* Gear icon */}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        {/* Text — hidden on mobile via CSS class */}
+        <span
+          className="settings-label"
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '10px',
+            letterSpacing: '0.08em',
+          }}
+        >
+          settings
+        </span>
+      </button>
+
+      {/* ── Settings Overlay (Zustand-driven, no page navigation) ── */}
+      <SettingsPage />
     </>
   )
 }

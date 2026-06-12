@@ -67,6 +67,119 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
   )
 }
 
+// ── ThemeToggle ─────────────────────────────────────────────────────────────
+function ThemeToggle() {
+  const theme = useUserStore((s) => s.theme)
+  const setTheme = useUserStore((s) => s.setTheme)
+
+  return (
+    <div style={{ marginBottom: '24px' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+        }}
+      >
+        <div>
+          <p
+            style={{
+              fontFamily: 'var(--font-sans)',
+              fontSize: '13px',
+              color: 'var(--ink)',
+              margin: '0 0 4px 0',
+            }}
+          >
+            Appearance
+          </p>
+          <p
+            style={{
+              fontFamily: 'var(--font-sans)',
+              fontSize: '12px',
+              color: 'var(--ink3)',
+              margin: 0,
+            }}
+          >
+            {theme === 'dark' ? 'Dark mode' : 'Light mode'}
+          </p>
+        </div>
+
+        {/* Moon | Sun pill */}
+        <div
+          role="group"
+          aria-label="Theme toggle"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            background: 'var(--bg3)',
+            border: '1px solid var(--line2)',
+            borderRadius: '20px',
+            padding: '3px',
+            gap: '2px',
+            flexShrink: 0,
+          }}
+        >
+          {/* Moon — dark */}
+          <button
+            id="theme-dark-btn"
+            onClick={() => setTheme('dark')}
+            aria-label="Dark mode"
+            aria-pressed={theme === 'dark'}
+            style={{
+              width: '30px',
+              height: '24px',
+              borderRadius: '16px',
+              border: 'none',
+              cursor: 'pointer',
+              background: theme === 'dark' ? 'var(--bg)' : 'transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background 200ms ease',
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={theme === 'dark' ? 'var(--accent)' : 'var(--ink3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </button>
+          {/* Sun — light */}
+          <button
+            id="theme-light-btn"
+            onClick={() => setTheme('light')}
+            aria-label="Light mode"
+            aria-pressed={theme === 'light'}
+            style={{
+              width: '30px',
+              height: '24px',
+              borderRadius: '16px',
+              border: 'none',
+              cursor: 'pointer',
+              background: theme === 'light' ? 'var(--bg)' : 'transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background 200ms ease',
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={theme === 'light' ? 'var(--accent)' : 'var(--ink3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="5"/>
+              <line x1="12" y1="1" x2="12" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="23"/>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="1" y1="12" x2="3" y2="12"/>
+              <line x1="21" y1="12" x2="23" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── TextPolishToggle ────────────────────────────────────────────────────────
 function TextPolishToggle() {
   const textPolish = useUserStore((s) => s.textPolish)
@@ -278,22 +391,23 @@ function AccountSection() {
   )
 }
 
-// ── Overlay variants ────────────────────────────────────────────────────────
+// ── Overlay animation variants ──────────────────────────────────────────────
 const desktopVariants = {
   hidden: { x: '100%', opacity: 0 },
-  visible: { x: 0, opacity: 1, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } },
-  exit: { x: '100%', opacity: 0, transition: { duration: 0.22, ease: [0.4, 0, 1, 1] } },
+  visible: { x: 0, opacity: 1, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] } },
+  exit: { x: '100%', opacity: 0, transition: { duration: 0.22, ease: [0.4, 0, 1, 1] as [number, number, number, number] } },
 }
 
 const mobileVariants = {
   hidden: { y: '100%' },
-  visible: { y: 0, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } },
-  exit: { y: '100%', transition: { duration: 0.22, ease: [0.4, 0, 1, 1] } },
+  visible: { y: 0, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] } },
+  exit: { y: '100%', transition: { duration: 0.22, ease: [0.4, 0, 1, 1] as [number, number, number, number] } },
 }
 
-// ── Main Settings Page ──────────────────────────────────────────────────────
+// ── Main Settings Overlay ───────────────────────────────────────────────────
 export default function SettingsPage() {
-  const router = useRouter()
+  const settingsOpen = useUserStore((s) => s.settingsOpen)
+  const setSettingsOpen = useUserStore((s) => s.setSettingsOpen)
   const [isMobile, setIsMobile] = useState(false)
   const [mounted, setMounted] = useState(false)
 
@@ -306,8 +420,8 @@ export default function SettingsPage() {
   }, [])
 
   const handleClose = useCallback(() => {
-    router.back()
-  }, [router])
+    setSettingsOpen(false)
+  }, [setSettingsOpen])
 
   // Close on Escape
   useEffect(() => {
@@ -325,7 +439,7 @@ export default function SettingsPage() {
     ? {
         position: 'fixed',
         inset: 0,
-        top: '10vh',
+        top: '15vh',
         background: 'var(--bg2)',
         borderTop: '1px solid var(--line2)',
         borderRadius: '16px 16px 0 0',
@@ -347,99 +461,103 @@ export default function SettingsPage() {
       }
 
   return (
-    <>
-      {/* Backdrop — click to close */}
-      <motion.div
-        key="settings-backdrop"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
-        onClick={handleClose}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 199,
-          background: 'transparent',
-        }}
-        aria-hidden="true"
-      />
-
-      {/* Overlay panel */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key="settings-panel"
-          variants={isMobile ? mobileVariants : desktopVariants}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-          style={overlayStyle}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header row */}
-          <div
+    <AnimatePresence>
+      {settingsOpen && (
+        <>
+          {/* Backdrop — click to close */}
+          <motion.div
+            key="settings-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={handleClose}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: '36px',
+              position: 'fixed',
+              inset: 0,
+              zIndex: 199,
+              background: 'transparent',
             }}
+            aria-hidden="true"
+          />
+
+          {/* Overlay panel */}
+          <motion.div
+            key="settings-panel"
+            variants={isMobile ? mobileVariants : desktopVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            style={overlayStyle}
+            onClick={(e) => e.stopPropagation()}
           >
-            <h1
+            {/* Header row */}
+            <div
               style={{
-                fontFamily: 'var(--font-serif)',
-                fontSize: '16px',
-                fontWeight: 400,
-                color: 'var(--ink)',
-                margin: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '36px',
               }}
             >
-              Settings
-            </h1>
-            <button
-              onClick={handleClose}
-              aria-label="Close settings"
-              style={{
-                background: 'none',
-                border: 'none',
-                fontFamily: 'var(--font-mono)',
-                fontSize: '18px',
-                color: 'var(--ink3)',
-                cursor: 'pointer',
-                padding: '0 0 2px 8px',
-                lineHeight: 1,
-              }}
-            >
-              ×
-            </button>
-          </div>
+              <h1
+                style={{
+                  fontFamily: 'var(--font-serif)',
+                  fontSize: '16px',
+                  fontWeight: 400,
+                  color: 'var(--ink)',
+                  margin: 0,
+                }}
+              >
+                Settings
+              </h1>
+              <button
+                id="settings-close-btn"
+                onClick={handleClose}
+                aria-label="Close settings"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '18px',
+                  color: 'var(--ink3)',
+                  cursor: 'pointer',
+                  padding: '0 0 2px 8px',
+                  lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
+            </div>
 
-          {/* ── Pages ── */}
-          <section style={{ marginBottom: '40px' }}>
-            <SectionHeader>Pages</SectionHeader>
-            <PageConfigList />
-          </section>
+            {/* ── Pages ── */}
+            <section style={{ marginBottom: '40px' }}>
+              <SectionHeader>Pages</SectionHeader>
+              <PageConfigList />
+            </section>
 
-          {/* Divider */}
-          <div style={{ height: '1px', background: 'var(--line)', marginBottom: '32px' }} />
+            {/* Divider */}
+            <div style={{ height: '1px', background: 'var(--line)', marginBottom: '32px' }} />
 
-          {/* ── Preferences ── */}
-          <section style={{ marginBottom: '40px' }}>
-            <SectionHeader>Preferences</SectionHeader>
-            <TextPolishToggle />
-            <NudgeTimePicker />
-          </section>
+            {/* ── Preferences ── */}
+            <section style={{ marginBottom: '40px' }}>
+              <SectionHeader>Preferences</SectionHeader>
+              <ThemeToggle />
+              <TextPolishToggle />
+              <NudgeTimePicker />
+            </section>
 
-          {/* Divider */}
-          <div style={{ height: '1px', background: 'var(--line)', marginBottom: '32px' }} />
+            {/* Divider */}
+            <div style={{ height: '1px', background: 'var(--line)', marginBottom: '32px' }} />
 
-          {/* ── Account ── */}
-          <section>
-            <SectionHeader>Account</SectionHeader>
-            <AccountSection />
-          </section>
-        </motion.div>
-      </AnimatePresence>
-    </>
+            {/* ── Account ── */}
+            <section>
+              <SectionHeader>Account</SectionHeader>
+              <AccountSection />
+            </section>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   )
 }

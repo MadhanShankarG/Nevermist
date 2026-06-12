@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { useUserStore } from '@/store/user'
 import type { PageConfig } from '@/types/notion'
 
 // ── Skeleton ───────────────────────────────────────────────────────────────
@@ -181,6 +183,8 @@ export default function PageConfigList() {
   const [pages, setPages] = useState<PageConfig[]>([])
   const [loading, setLoading] = useState(true)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const router = useRouter()
+  const setSettingsOpen = useUserStore((s) => s.setSettingsOpen)
 
   // Fetch on mount
   useEffect(() => {
@@ -251,6 +255,11 @@ export default function PageConfigList() {
     })
   }, [scheduleSave])
 
+  const handleChangePages = useCallback(() => {
+    setSettingsOpen(false)
+    router.push('/onboarding?reconfigure=true')
+  }, [router, setSettingsOpen])
+
   if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -274,7 +283,7 @@ export default function PageConfigList() {
             fontFamily: 'var(--font-sans)',
             fontSize: '13px',
             color: 'var(--ink3)',
-            margin: 0,
+            margin: '0 0 16px 0',
           }}
         >
           No pages configured.
@@ -307,6 +316,28 @@ export default function PageConfigList() {
           )}
         </div>
       )}
+
+      {/* Change pages — re-runs onboarding page selection */}
+      <button
+        id="change-pages-btn"
+        onClick={handleChangePages}
+        style={{
+          marginTop: '16px',
+          background: 'none',
+          border: 'none',
+          fontFamily: 'var(--font-mono)',
+          fontSize: '11px',
+          color: 'var(--ink3)',
+          cursor: 'pointer',
+          padding: 0,
+          letterSpacing: '0.05em',
+          transition: 'color 150ms ease',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--ink2)' }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--ink3)' }}
+      >
+        Change pages →
+      </button>
     </div>
   )
 }

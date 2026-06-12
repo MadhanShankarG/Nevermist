@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { AnimatePresence } from 'framer-motion'
 import ConnectStep from '@/components/onboarding/ConnectStep'
@@ -18,13 +18,18 @@ interface NotionPageItem {
 
 type OnboardingStep = 'connect' | 'pages' | 'describe'
 
-export default function OnboardingPage() {
+// Inner component that uses useSearchParams — must be wrapped in Suspense
+function OnboardingInner() {
   const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const isReconfigure = searchParams.get('reconfigure') === 'true'
+
   const [step, setStep] = useState<OnboardingStep>('connect')
   const [selectedPages, setSelectedPages] = useState<NotionPageItem[]>([])
 
-  // If already authenticated, skip to pages step
+  // If already authenticated, skip connect step.
+  // If reconfiguring, jump straight to pages selection.
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
       setStep('pages')
@@ -46,7 +51,7 @@ export default function OnboardingPage() {
 
   if (isLoading) {
     return (
-      <main
+      <div
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -58,21 +63,17 @@ export default function OnboardingPage() {
         }}
       >
         loading...
-      </main>
+      </div>
     )
   }
 
+  // Step indicators — skip 'connect' step when reconfiguring
+  const visibleSteps = isReconfigure
+    ? (['pages', 'describe'] as OnboardingStep[])
+    : (['connect', 'pages', 'describe'] as OnboardingStep[])
+
   return (
-    <main
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        padding: '2rem',
-      }}
-    >
+    <>
       {/* Step indicator */}
       <div
         style={{
@@ -81,7 +82,7 @@ export default function OnboardingPage() {
           marginBottom: '2.5rem',
         }}
       >
-        {['connect', 'pages', 'describe'].map((s, i) => (
+        {visibleSteps.map((s, i) => (
           <div
             key={s}
             style={{
@@ -89,7 +90,7 @@ export default function OnboardingPage() {
               height: '2px',
               borderRadius: '1px',
               backgroundColor:
-                i <= ['connect', 'pages', 'describe'].indexOf(step)
+                i <= visibleSteps.indexOf(step)
                   ? 'var(--sage)'
                   : 'var(--bg4)',
               transition: 'background-color 0.3s ease',
@@ -99,7 +100,7 @@ export default function OnboardingPage() {
       </div>
 
       <AnimatePresence mode="wait">
-        {step === 'connect' && (
+        {step === 'connect' && !isReconfigure && (
           <ConnectStep key="connect" onConnect={handleConnect} />
         )}
         {step === 'pages' && (
@@ -113,6 +114,39 @@ export default function OnboardingPage() {
           />
         )}
       </AnimatePresence>
+    </>
+  )
+}
+
+// Page wrapper — Suspense required for useSearchParams
+export default function OnboardingPage() {
+  return (
+    <main
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        padding: '2rem',
+      }}
+    >
+      <Suspense
+        fallback={
+          <div
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '12px',
+              color: 'var(--ink3)',
+              letterSpacing: '0.05em',
+            }}
+          >
+            loading...
+          </div>
+        }
+      >
+        <OnboardingInner />
+      </Suspense>
     </main>
   )
 }

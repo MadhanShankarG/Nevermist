@@ -36,6 +36,29 @@
 }
 
 /* ─────────────────────────────────────────────
+   Light Mode Override
+   ───────────────────────────────────────────── */
+
+[data-theme="light"] {
+  --bg: #F8F6F2;
+  --bg2: #EFEDE8;
+  --bg3: #E6E3DC;
+  --bg4: #DAD7CF;
+  --line: #D0CDC5;
+  --line2: #C8C4BC;
+  --ink: #1A1714;
+  --ink2: #5C5248;
+  --ink3: #9C9088;
+  --accent: #A67C52;
+  --sage: #5C7A68;
+  --amber: #9C7038;
+  --red: #965040;
+  --sage-bg: #E8F0EC;
+  --amb-bg: #F0E8DC;
+  --red-bg: #F0E4E0;
+}
+
+/* ─────────────────────────────────────────────
    Base Styles
    ───────────────────────────────────────────── */
 
@@ -84,5 +107,19 @@ body::before {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Settings trigger — hide text label on mobile
+   ───────────────────────────────────────────── */
+
+.settings-label {
+  display: inline;
+}
+
+@media (max-width: 639px) {
+  .settings-label {
+    display: none;
   }
 }
