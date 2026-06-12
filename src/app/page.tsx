@@ -676,7 +676,7 @@ export default function Home() {
                   thinking…
                 </span>
               ) : (
-                <SendButton onSend={handleSubmit} />
+                <SendButton onSend={handleSubmit} disabled={preview.visible} />
               )}
             </motion.div>
           </div>

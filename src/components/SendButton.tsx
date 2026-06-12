@@ -5,12 +5,14 @@ import { useCaptureStore } from '@/store/capture'
 
 interface SendButtonProps {
   onSend: () => void
+  disabled?: boolean
 }
 
-export default function SendButton({ onSend }: SendButtonProps) {
+export default function SendButton({ onSend, disabled = false }: SendButtonProps) {
   const inputValue = useCaptureStore((s) => s.inputValue)
   const isProcessing = useCaptureStore((s) => s.isProcessing)
   const hasContent = inputValue.trim().length > 0
+  const isDisabled = isProcessing || disabled
 
   return (
     <AnimatePresence initial={false}>
@@ -23,7 +25,7 @@ export default function SendButton({ onSend }: SendButtonProps) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15, ease: 'easeInOut' }}
           onClick={onSend}
-          disabled={isProcessing}
+          disabled={isDisabled}
           whileTap={{ scale: 0.95, transition: { duration: 0.1, ease: 'easeInOut' } }}
           style={{
             display: 'inline-flex',
@@ -38,14 +40,15 @@ export default function SendButton({ onSend }: SendButtonProps) {
             letterSpacing: '0.1em',
             borderRadius: '20px',
             border: 'none',
-            cursor: isProcessing ? 'not-allowed' : 'pointer',
+            cursor: isDisabled ? 'not-allowed' : 'pointer',
             whiteSpace: 'nowrap',
             flexShrink: 0,
-            opacity: isProcessing ? 0.5 : 1,
-            transition: 'background-color 150ms ease',
+            opacity: isDisabled ? 0.4 : 1,
+            pointerEvents: isDisabled ? 'none' : 'auto',
+            transition: 'background-color 150ms ease, opacity 150ms ease',
           }}
           onMouseEnter={(e) => {
-            if (!isProcessing) e.currentTarget.style.backgroundColor = 'var(--accent)'
+            if (!isDisabled) e.currentTarget.style.backgroundColor = 'var(--accent)'
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'var(--ink)'
