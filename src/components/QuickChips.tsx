@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from 'react'
 import { useUserStore } from '@/store/user'
 import { useCaptureStore } from '@/store/capture'
 import { useVoice } from '@/hooks/useVoice'
+import { useCamera } from '@/hooks/useCamera'
 
 interface QuickChipsProps {
   onChipClick?: (chipId: string) => void
@@ -59,6 +60,7 @@ export default function QuickChips({ onChipClick }: QuickChipsProps) {
   const setInputMode = useCaptureStore((s) => s.setInputMode)
 
   const voice = useVoice()
+  const { capturePhoto } = useCamera()
 
   // 200ms accent flash on tap
   const [activeChip, setActiveChip] = useState<string | null>(null)
@@ -119,14 +121,12 @@ export default function QuickChips({ onChipClick }: QuickChipsProps) {
     })
   }, [flashAndRun, voice, setInputMode])
 
-  // ── Scan: set photo mode then click camera input ──────────────────────────
+  // ── Scan: call capturePhoto() exactly as CameraButton does ──────────────
   const handleScan = useCallback(() => {
     flashAndRun('scan-notes', () => {
-      setInputMode('photo')
-      const cameraInput = document.getElementById('camera-input') as HTMLInputElement | null
-      cameraInput?.click()
+      capturePhoto()
     })
-  }, [flashAndRun, setInputMode])
+  }, [flashAndRun, capturePhoto])
 
   // ── Chip definitions ──────────────────────────────────────────────────────
   type ChipDef =
