@@ -38,6 +38,13 @@ function getEndTime(startTime: string, duration: number): string {
   return `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`
 }
 
+function formatTime(time: string): string {
+  const [hours, mins] = time.split(':').map(Number)
+  const period = hours >= 12 ? 'PM' : 'AM'
+  const displayHours = hours % 12 || 12
+  return `${displayHours}:${String(mins).padStart(2, '0')} ${period}`
+}
+
 export async function sendSingleTask(
   notion: Client,
   task: SingleTaskPayload,
@@ -77,10 +84,14 @@ export async function sendSingleTask(
           ? 'P2 — Important'
           : 'P3 — Someday'
 
+    const titleWithTime = task.dueTime
+      ? `${task.cleanedTask} (${formatTime(task.dueTime)})`
+      : task.cleanedTask
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const properties: Record<string, any> = {
       [titleProp]: {
-        title: [{ text: { content: task.cleanedTask } }],
+        title: [{ text: { content: titleWithTime } }],
       },
     }
 
@@ -159,7 +170,7 @@ export async function sendSingleTask(
         {
           type: 'to_do',
           to_do: {
-            rich_text: [{ type: 'text', text: { content: task.cleanedTask } }],
+            rich_text: [{ type: 'text', text: { content: task.dueTime ? `${task.cleanedTask} (${formatTime(task.dueTime)})` : task.cleanedTask } }],
             checked: false,
             children: [
               {
