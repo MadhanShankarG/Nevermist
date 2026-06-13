@@ -15,6 +15,7 @@ model User {
   textPolish           Boolean      @default(true)
   nudgeTime            String?
   pushSubscription     String?
+  calendarToken        String?      @unique
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
   pages                PageConfig[]

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, isAuthenticated } from '@/lib/auth-guard'
 import { prisma } from '@/lib/prisma'
 
+import { randomBytes } from 'crypto'
+
 export async function GET() {
   const auth = await requireAuth()
   if (!isAuthenticated(auth)) return auth
@@ -11,7 +13,22 @@ export async function GET() {
     orderBy: { sortOrder: 'asc' },
   })
 
-  return NextResponse.json({ pages })
+  // Generate calendarToken on first access if not already set
+  let user = await prisma.user.findUnique({
+    where: { id: auth.userId },
+    select: { calendarToken: true },
+  })
+
+  if (!user?.calendarToken) {
+    const token = randomBytes(16).toString('hex')
+    user = await prisma.user.update({
+      where: { id: auth.userId },
+      data: { calendarToken: token },
+      select: { calendarToken: true },
+    })
+  }
+
+  return NextResponse.json({ pages, calendarToken: user!.calendarToken })
 }
 
 export async function POST(request: NextRequest) {
