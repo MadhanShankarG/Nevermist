@@ -92,9 +92,11 @@ export async function sendSingleTask(
       const dateValue = task.dueTime
         ? {
             start: `${task.dueDate}T${task.dueTime}:00`,
-            end: task.duration > 0
-              ? `${task.dueDate}T${getEndTime(task.dueTime, task.duration)}:00`
-              : undefined,
+            end: `${task.dueDate}T${getEndTime(task.dueTime, task.duration || 60)}:00`,
+            reminder: {
+              unit: 'minute' as const,
+              value: 30,
+            },
           }
         : { start: task.dueDate }
       properties[dueDatePropName] = { date: dateValue }

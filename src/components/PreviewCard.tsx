@@ -295,26 +295,31 @@ export default function PreviewCard({ onSend, onCancel, isSending }: PreviewCard
                       >
                         <span
                           style={{
-                            fontFamily: 'var(--font-mono)',
+                            fontFamily: 'var(--font-sans)',
                             fontSize: '11px',
                             color: 'var(--ink3)',
-                            letterSpacing: '0.04em',
                           }}
                         >
-                          time
+                          Time
                         </span>
                         <input
                           id="preview-time-input"
                           type="time"
                           value={preview.dueTime ?? ''}
-                          onChange={(e) =>
-                            preview.setPreview({ dueTime: e.target.value || null })
-                          }
+                          onChange={(e) => {
+                            const val = e.target.value
+                            if (!val) {
+                              preview.setPreview({ dueTime: null, duration: 0 })
+                            } else {
+                              preview.setPreview({ dueTime: val })
+                            }
+                          }}
                           style={{
-                            background: 'var(--bg4)',
-                            border: '1px solid var(--line2)',
-                            borderRadius: '6px',
-                            padding: '3px 8px',
+                            background: 'transparent',
+                            border: 'none',
+                            borderBottom: '1px solid var(--line2)',
+                            borderRadius: 0,
+                            padding: '2px 4px',
                             fontFamily: 'var(--font-mono)',
                             fontSize: '11px',
                             color: 'var(--ink2)',
@@ -324,10 +329,9 @@ export default function PreviewCard({ onSend, onCancel, isSending }: PreviewCard
                         />
                         <span
                           style={{
-                            fontFamily: 'var(--font-mono)',
+                            fontFamily: 'var(--font-sans)',
                             fontSize: '11px',
                             color: 'var(--ink3)',
-                            letterSpacing: '0.04em',
                           }}
                         >
                           for
@@ -335,29 +339,31 @@ export default function PreviewCard({ onSend, onCancel, isSending }: PreviewCard
                         <input
                           id="preview-duration-input"
                           type="number"
-                          min={0}
+                          min={15}
+                          max={480}
                           step={15}
-                          value={preview.duration}
+                          value={preview.duration || 60}
                           onChange={(e) =>
                             preview.setPreview({
-                              duration: Math.max(0, parseInt(e.target.value, 10) || 0),
+                              duration: Math.min(480, Math.max(15, parseInt(e.target.value, 10) || 60)),
                             })
                           }
                           style={{
-                            background: 'var(--bg4)',
-                            border: '1px solid var(--line2)',
-                            borderRadius: '6px',
-                            padding: '3px 8px',
+                            background: 'transparent',
+                            border: 'none',
+                            borderBottom: '1px solid var(--line2)',
+                            borderRadius: 0,
+                            padding: '2px 4px',
                             fontFamily: 'var(--font-mono)',
                             fontSize: '11px',
                             color: 'var(--ink2)',
-                            width: '60px',
+                            width: '52px',
                             outline: 'none',
                           }}
                         />
                         <span
                           style={{
-                            fontFamily: 'var(--font-mono)',
+                            fontFamily: 'var(--font-sans)',
                             fontSize: '11px',
                             color: 'var(--ink3)',
                           }}

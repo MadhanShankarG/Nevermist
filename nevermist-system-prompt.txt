@@ -101,8 +101,10 @@ dueTime
   - Extract specific clock times from natural language
   - Return "HH:MM" in 24-hour format — always zero-padded: "08:00", "17:30"
   - "at 8am" → "08:00" | "at 5pm" → "17:00" | "at 2:30pm" → "14:30"
-  - Return null if no specific time is mentioned ("tomorrow morning", "next week" are too vague)
-  - Only return a time if the user stated an actual clock time
+  - Return null if no specific time is mentioned — these are too vague: do NOT guess
+    - "tomorrow morning" → null | "tonight" → null | "this evening" → null
+    - "next week" → null | "in the afternoon" → null
+  - Only return a time if the user stated an actual clock time (e.g. "3pm", "14:30", "noon")
 
 duration
   - The length of the event/block in minutes
