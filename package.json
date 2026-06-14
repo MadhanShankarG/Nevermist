@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "kill -9 $(lsof -ti:3000) 2>/dev/null; next dev -p 3000",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "db:push": "prisma db push",
