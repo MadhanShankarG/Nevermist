@@ -105,11 +105,8 @@ export async function sendSingleTask(
           ? 'P2 — Important'
           : 'P3 — Someday'
 
-    const titleWithTime = task.dueTime
-      ? `${task.cleanedTask} (${formatTime(task.dueTime)})`
-      : task.cleanedTask
+    const titleWithTime = task.cleanedTask
 
-    
     const timezone = (task as { timezone?: string }).timezone ?? 'Asia/Kolkata'
     const offset = getTimezoneOffset(timezone)
 
