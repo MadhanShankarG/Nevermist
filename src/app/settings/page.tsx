@@ -342,6 +342,7 @@ function NudgeTimePicker() {
 // ── CalendarSection ─────────────────────────────────────────────────────────
 function CalendarSection() {
   const [token, setToken] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
@@ -351,18 +352,18 @@ function CalendarSection() {
         if (d.calendarToken) setToken(d.calendarToken)
       })
       .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
 
-  const feedUrl = token
-    ? `https://nevermist.vercel.app/api/calendar?token=${token}`
-    : null
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://nevermist.vercel.app'
+  const feedUrl = token ? `${appUrl}/api/calendar?token=${token}` : null
 
   const handleCopy = async () => {
     if (!feedUrl) return
     try {
       await navigator.clipboard.writeText(feedUrl)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      setTimeout(() => setCopied(false), 1500)
     } catch {
       alert(feedUrl)
     }
@@ -373,15 +374,15 @@ function CalendarSection() {
     window.open(feedUrl.replace('https://', 'webcal://'), '_blank')
   }
 
-  const btnStyle: React.CSSProperties = {
+  const baseBtnStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-mono)',
+    fontSize: '11px',
+    border: '1px solid var(--line2)',
+    borderRadius: '6px',
+    padding: '6px 14px',
+    cursor: 'pointer',
     background: 'none',
-    border: 'none',
-    fontFamily: 'var(--font-sans)',
-    fontSize: '13px',
-    color: 'var(--accent)',
-    cursor: token ? 'pointer' : 'default',
-    padding: 0,
-    opacity: token ? 1 : 0.4,
+    transition: 'opacity 120ms ease',
   }
 
   return (
@@ -389,20 +390,48 @@ function CalendarSection() {
       <p style={{ fontFamily: 'var(--font-sans)', fontSize: '13px', color: 'var(--ink)', margin: '0 0 4px 0' }}>
         Calendar sync
       </p>
-      <p style={{ fontFamily: 'var(--font-sans)', fontSize: '12px', color: 'var(--ink3)', margin: '0 0 14px 0' }}>
+      <p style={{ fontFamily: 'var(--font-sans)', fontSize: '13px', color: 'var(--ink2)', margin: '0 0 16px 0' }}>
         Subscribe to your tasks in any calendar app.
+        <br />Tasks with due dates appear automatically.
       </p>
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
-        <button id="calendar-copy-btn" style={btnStyle} onClick={handleCopy}>
-          {copied ? 'Copied!' : 'Copy feed URL'}
-        </button>
-        <button id="calendar-open-btn" style={btnStyle} onClick={handleOpenInCalendar}>
-          Open in Calendar ↗
-        </button>
-      </div>
-      <p style={{ fontFamily: 'var(--font-sans)', fontSize: '11px', color: 'var(--ink3)', margin: 0, lineHeight: 1.6 }}>
-        Tasks with due dates appear automatically.<br />
-        Updates every hour.
+
+      {loading ? (
+        // Skeleton while token loads
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+          {[80, 120].map((w) => (
+            <div
+              key={w}
+              style={{
+                width: w,
+                height: 30,
+                borderRadius: '6px',
+                background: 'var(--line)',
+                opacity: 0.5,
+              }}
+            />
+          ))}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
+          <button
+            id="calendar-copy-btn"
+            style={{ ...baseBtnStyle, color: 'var(--ink2)' }}
+            onClick={handleCopy}
+          >
+            {copied ? 'Copied!' : 'Copy feed URL'}
+          </button>
+          <button
+            id="calendar-open-btn"
+            style={{ ...baseBtnStyle, color: 'var(--accent)', borderColor: 'var(--accent)' }}
+            onClick={handleOpenInCalendar}
+          >
+            Open in Calendar ↗
+          </button>
+        </div>
+      )}
+
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--ink3)', margin: 0, lineHeight: 1.6 }}>
+        Updates when your calendar app refreshes.
       </p>
     </div>
   )
