@@ -27,6 +27,13 @@ function validateCaptureResult(obj: unknown): obj is CaptureResult {
   return REQUIRED_FIELDS.every((field) => field in record)
 }
 
+// Returns the list of missing field names — used for detailed error logging
+function getMissingFields(obj: unknown): string[] {
+  if (!obj || typeof obj !== 'object') return REQUIRED_FIELDS
+  const record = obj as Record<string, unknown>
+  return REQUIRED_FIELDS.filter((field) => !(field in record))
+}
+
 export async function POST(request: NextRequest) {
   const auth = await requireAuth()
   if (!isAuthenticated(auth)) return auth
@@ -174,11 +181,19 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      for (const item of parsed) {
+      // DEBUG — log full photo response to verify dueTime/duration per task
+      // TODO: remove once photo field parity is confirmed in production
+      console.log('[capture] photo mode raw response:', JSON.stringify(parsed, null, 2))
+
+      for (const [index, item] of parsed.entries()) {
         if (!validateCaptureResult(item)) {
-          console.error('Photo task missing required fields:', item)
+          const missing = getMissingFields(item)
+          console.error(
+            `[capture] photo task[${index}] missing fields: ${missing.join(', ')}`,
+            JSON.stringify(item, null, 2)
+          )
           return NextResponse.json(
-            { error: 'AI response missing required fields in photo task' },
+            { error: `AI response missing required fields in photo task: ${missing.join(', ')}` },
             { status: 500 }
           )
         }
@@ -188,9 +203,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (!validateCaptureResult(parsed)) {
-      console.error('Response missing required fields:', parsed)
+      const missing = getMissingFields(parsed)
+      console.error(
+        `[capture] text/voice response missing fields: ${missing.join(', ')}`,
+        JSON.stringify(parsed, null, 2)
+      )
       return NextResponse.json(
-        { error: 'AI response missing required fields' },
+        { error: `AI response missing required fields: ${missing.join(', ')}` },
         { status: 500 }
       )
     }
