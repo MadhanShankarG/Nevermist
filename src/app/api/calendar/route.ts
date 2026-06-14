@@ -6,22 +6,7 @@ import { decrypt } from '@/lib/encrypt'
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function toIcalDate(dateStr: string): string {
-  // "2026-06-16" → "20260616"
   return dateStr.replace(/-/g, '')
-}
-
-function toIcalDateTime(dateStr: string, timeStr: string): string {
-  // "2026-06-16" + "08:00" → "20260616T080000"
-  return `${dateStr.replace(/-/g, '')}T${timeStr.replace(':', '')}00`
-}
-
-function addMinutes(dateStr: string, timeStr: string, minutes: number): string {
-  const [h, m] = timeStr.split(':').map(Number)
-  const total = h * 60 + m + minutes
-  const endH = Math.floor(total / 60) % 24
-  const endM = total % 60
-  const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`
-  return toIcalDateTime(dateStr, endTime)
 }
 
 function stamp(): string {
@@ -34,6 +19,42 @@ function escapeIcal(str: string): string {
     .replace(/;/g, '\\;')
     .replace(/,/g, '\\,')
     .replace(/\n/g, '\\n')
+}
+
+/**
+ * Converts a Notion datetime string (ISO 8601 with offset, e.g. "2026-06-17T08:00:00+05:30")
+ * to a UTC iCal datetime string (e.g. "20260617T023000Z").
+ * JS Date correctly parses ISO 8601 with timezone offsets, so no manual arithmetic needed.
+ */
+function notionDateToUtcIcal(notionDateStr: string): string {
+  const d = new Date(notionDateStr)
+  const y = d.getUTCFullYear()
+  const mo = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(d.getUTCDate()).padStart(2, '0')
+  const h = String(d.getUTCHours()).padStart(2, '0')
+  const mi = String(d.getUTCMinutes()).padStart(2, '0')
+  return `${y}${mo}${day}T${h}${mi}00Z`
+}
+
+/**
+ * Adds `minutes` to a UTC iCal string ("20260617T023000Z") and returns the result.
+ * Used to compute DTEND for timed events when Notion has no end time.
+ */
+function addMinutesToUtcIcal(utcIcal: string, minutes: number): string {
+  // Parse back from "YYYYMMDDTHHmmssZ"
+  const year = parseInt(utcIcal.slice(0, 4))
+  const month = parseInt(utcIcal.slice(4, 6)) - 1
+  const day = parseInt(utcIcal.slice(6, 8))
+  const hour = parseInt(utcIcal.slice(9, 11))
+  const min = parseInt(utcIcal.slice(11, 13))
+  const d = new Date(Date.UTC(year, month, day, hour, min))
+  d.setUTCMinutes(d.getUTCMinutes() + minutes)
+  const y = d.getUTCFullYear()
+  const mo = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const da = String(d.getUTCDate()).padStart(2, '0')
+  const h = String(d.getUTCHours()).padStart(2, '0')
+  const mi = String(d.getUTCMinutes()).padStart(2, '0')
+  return `${y}${mo}${da}T${h}${mi}00Z`
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -50,24 +71,17 @@ function extractPageData(page: any, dueDatePropName: string) {
   const dateProp = page.properties[dueDatePropName]
   if (!dateProp || dateProp.type !== 'date' || !dateProp.date?.start) return null
 
-  const start: string = dateProp.date.start // "2026-06-16" or "2026-06-16T08:00:00.000+05:30"
-  const hasTime = start.includes('T')
+  // Preserve the raw Notion string — it carries the offset (e.g. "+05:30")
+  const rawStart: string = dateProp.date.start
+  const rawEnd: string | null = dateProp.date.end ?? null
+  const hasTime = rawStart.includes('T')
 
-  let dueDate: string
-  let dueTime: string | null = null
-
-  if (hasTime) {
-    const dt = new Date(start)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    dueDate = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`
-    dueTime = `${pad(dt.getHours())}:${pad(dt.getMinutes())}`
-  } else {
-    dueDate = start
-  }
+  // For all-day events we still need a plain date string
+  const dueDate: string = hasTime ? rawStart.split('T')[0] : rawStart
 
   const notionPageId: string = page.id
 
-  return { title, dueDate, dueTime, notionPageId }
+  return { title, rawStart, rawEnd, dueDate, hasTime, notionPageId }
 }
 
 // ── Route ─────────────────────────────────────────────────────────────────────
@@ -133,24 +147,28 @@ export async function GET(request: NextRequest) {
         const notionUrl = `https://notion.so/${data.notionPageId.replace(/-/g, '')}`
         const summary = escapeIcal(data.title)
 
-        if (data.dueTime) {
-          // Timed event — 1 hour block
-          const dtStart = toIcalDateTime(data.dueDate, data.dueTime)
-          const dtEnd = addMinutes(data.dueDate, data.dueTime, 60)
+        if (data.hasTime) {
+          // Timed event — convert raw Notion ISO string (with offset) to UTC
+          const dtStart = notionDateToUtcIcal(data.rawStart)
+          // Use Notion end time if present; otherwise default to +1 hour
+          const dtEnd = data.rawEnd
+            ? notionDateToUtcIcal(data.rawEnd)
+            : addMinutesToUtcIcal(dtStart, 60)
+
           events.push(
             [
               'BEGIN:VEVENT',
               `UID:${uid}`,
               `DTSTAMP:${dtstamp}`,
-              `DTSTART;TZID=Asia/Kolkata:${dtStart}`,
-              `DTEND;TZID=Asia/Kolkata:${dtEnd}`,
+              `DTSTART:${dtStart}`,
+              `DTEND:${dtEnd}`,
               `SUMMARY:${summary}`,
               `URL:${notionUrl}`,
               'END:VEVENT',
             ].join('\r\n'),
           )
         } else {
-          // All-day event
+          // All-day event — date-only values have no timezone issue
           const dateVal = toIcalDate(data.dueDate)
           events.push(
             [
@@ -179,7 +197,6 @@ export async function GET(request: NextRequest) {
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'X-WR-CALNAME:Nevermist Tasks',
-    'X-WR-TIMEZONE:Asia/Kolkata',
     ...events,
     'END:VCALENDAR',
   ].join('\r\n')
