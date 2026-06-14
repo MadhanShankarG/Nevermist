@@ -26,6 +26,15 @@ const PRIORITY_COLORS: Record<
   P3: { text: '#6BA888', bg: '#0E1A14', border: '#1A3028' },
 }
 
+function formatTime(time: string): string {
+  const [hourStr, minuteStr] = time.split(':')
+  const hour = parseInt(hourStr, 10)
+  const minute = minuteStr ?? '00'
+  const period = hour >= 12 ? 'PM' : 'AM'
+  const displayHour = hour % 12 === 0 ? 12 : hour % 12
+  return `${displayHour}:${minute} ${period}`
+}
+
 export default function TaskChip({
   task,
   index,
@@ -35,13 +44,34 @@ export default function TaskChip({
 }: TaskChipProps) {
   const isUncertain = task.cleanedTask.includes('[?]')
   const [isEditing, setIsEditing] = useState(false)
-  const [editValue, setEditValue] = useState(task.cleanedTask)
   const [showPagePicker, setShowPagePicker] = useState(false)
+
+  // FIX: editValue must stay in sync with task.cleanedTask from the parent.
+  // Using useState(task.cleanedTask) only runs once on mount — if the parent
+  // swaps tasks (e.g. new photo scan), the input keeps the old value.
+  // Storing the last seen prop value and syncing on change fixes this.
+  const [editValue, setEditValue] = useState(task.cleanedTask)
+  const prevCleanedTaskRef = useRef(task.cleanedTask)
+  useEffect(() => {
+    if (task.cleanedTask !== prevCleanedTaskRef.current && !isEditing) {
+      setEditValue(task.cleanedTask)
+      prevCleanedTaskRef.current = task.cleanedTask
+    }
+  }, [task.cleanedTask, isEditing])
 
   // Local priority state — initialised from prop, propagated up on every change
   const [priority, setPriority] = useState<'P1' | 'P2' | 'P3'>(
     task.priority ?? 'P2',
   )
+
+  // Keep priority in sync if parent task changes (same stale-state issue)
+  const prevPriorityRef = useRef(task.priority)
+  useEffect(() => {
+    if (task.priority !== prevPriorityRef.current) {
+      setPriority(task.priority ?? 'P2')
+      prevPriorityRef.current = task.priority
+    }
+  }, [task.priority])
 
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -51,6 +81,7 @@ export default function TaskChip({
 
   const commitEdit = () => {
     onUpdate(index, { cleanedTask: editValue })
+    prevCleanedTaskRef.current = editValue
     setIsEditing(false)
   }
 
@@ -58,10 +89,13 @@ export default function TaskChip({
     e.stopPropagation()
     const next = PRIORITY_CYCLE[priority] ?? 'P2'
     setPriority(next)
+    prevPriorityRef.current = next
     onUpdate(index, { priority: next })
   }
 
   const priorityStyle = PRIORITY_COLORS[priority] ?? PRIORITY_COLORS.P2
+
+  const hasDueTime = task.dueTime !== null && task.dueTime !== undefined
 
   return (
     <div
@@ -113,6 +147,20 @@ export default function TaskChip({
           }}
         >
           {task.cleanedTask}
+        </span>
+      )}
+
+      {/* Due time + duration row — only shown when dueTime is set */}
+      {hasDueTime && (
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '10px',
+            color: 'var(--ink3)',
+            letterSpacing: '0.04em',
+          }}
+        >
+          {formatTime(task.dueTime!)} · {task.duration || 60} min
         </span>
       )}
 
