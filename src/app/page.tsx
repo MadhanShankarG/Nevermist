@@ -382,70 +382,114 @@ export default function Home() {
     await submit()
   }, [inputValue, submit])
 
-  // 2. Send confirmed preview to Notion
   const handleNotionSend = useCallback(async () => {
-    setIsSending(true)
+  setIsSending(true)
 
-    const result = {
-      cleanedTask: preview.cleanedTask,
-      destinationPageId: preview.destinationPageId,
-      destinationName: preview.destinationName,
-      priority: preview.priority,
-      dueDate: preview.dueDate,
-      dueTime: preview.dueTime,
-      duration: preview.duration,
-      isRecurring: preview.isRecurring,
-      recurringPattern: preview.recurringPattern,
-      isUrl: preview.isUrl,
-      sourceUrl: preview.sourceUrl,
+  const isPhotoMode = preview.tasks.length > 0
+
+  if (isPhotoMode) {
+    // ── Photo mode: send all tasks sequentially ──
+    const tasks = preview.tasks
+    let successCount = 0
+
+    for (const task of tasks) {
+      await sendToNotion(
+        task,
+        () => { successCount++ },
+        (message) => { console.error('Notion send error (photo task):', task.cleanedTask, message) },
+      )
     }
 
-    await sendToNotion(
-      result,
-      // onSuccess
-      (sent) => {
-        setToast({
-          destinationName: sent.destinationName,
-          priority: sent.priority,
-          dueDate: sent.dueDate,
-        })
-        resetPreview()
-        resetCapture()
-        if (!hasCompletedFirstCapture) {
-          setHasCompletedFirstCapture(true)
-          localStorage.setItem('nevermist:firstCapture', 'true')
+    // Single toast summarising the batch
+    if (successCount > 0) {
+      setToast({
+        destinationName: tasks[0]?.destinationName ?? '',
+        priority: tasks[0]?.priority ?? 'P2',
+        dueDate: tasks[0]?.dueDate ?? null,
+      })
+    }
+
+    resetPreview()
+    resetCapture()
+
+    if (!hasCompletedFirstCapture) {
+      setHasCompletedFirstCapture(true)
+      localStorage.setItem('nevermist:firstCapture', 'true')
+    }
+
+    setCaptureCount((prev) => {
+      const next = prev + successCount
+      localStorage.setItem('nevermist:captureCount', String(next))
+      if (next >= 3 && !nudgeShownRef.current && !nudgeDismissed && pushSupported) {
+        nudgeShownRef.current = true
+        setShowNudgePrompt(true)
+      }
+      return next
+    })
+
+    setIsSending(false)
+    return
+  }
+
+  // ── Single task mode (text / voice / url) ──
+  const result = {
+    cleanedTask: preview.cleanedTask,
+    destinationPageId: preview.destinationPageId,
+    destinationName: preview.destinationName,
+    priority: preview.priority,
+    dueDate: preview.dueDate,
+    dueTime: preview.dueTime,
+    duration: preview.duration,
+    isRecurring: preview.isRecurring,
+    recurringPattern: preview.recurringPattern,
+    isUrl: preview.isUrl,
+    sourceUrl: preview.sourceUrl,
+  }
+
+  await sendToNotion(
+    result,
+    // onSuccess
+    (sent) => {
+      setToast({
+        destinationName: sent.destinationName,
+        priority: sent.priority,
+        dueDate: sent.dueDate,
+      })
+      resetPreview()
+      resetCapture()
+      if (!hasCompletedFirstCapture) {
+        setHasCompletedFirstCapture(true)
+        localStorage.setItem('nevermist:firstCapture', 'true')
+      }
+
+      setCaptureCount((prev) => {
+        const next = prev + 1
+        localStorage.setItem('nevermist:captureCount', String(next))
+        if (next >= 3 && !nudgeShownRef.current && !nudgeDismissed && pushSupported) {
+          nudgeShownRef.current = true
+          setShowNudgePrompt(true)
         }
+        return next
+      })
 
-        // Increment capture count and check for nudge prompt trigger
-        setCaptureCount((prev) => {
-          const next = prev + 1
-          localStorage.setItem('nevermist:captureCount', String(next))
-          // Show nudge prompt after 3rd capture (only once, only if supported)
-          if (next >= 3 && !nudgeShownRef.current && !nudgeDismissed && pushSupported) {
-            nudgeShownRef.current = true
-            setShowNudgePrompt(true)
-          }
-          return next
-        })
-
-        setIsSending(false)
-      },
-      // onError
-      (message) => {
-        console.error('Notion send error:', message)
-        setIsSending(false)
-      },
-    )
-  }, [
-    preview,
-    sendToNotion,
-    resetCapture,
-    resetPreview,
-    hasCompletedFirstCapture,
-    setHasCompletedFirstCapture,
-    nudgeDismissed,
-    pushSupported,
-  ])
+      setIsSending(false)
+    },
+    // onError
+    (message) => {
+      console.error('Notion send error:', message)
+      setIsSending(false)
+    },
+  )
+}, [
+  preview,
+  sendToNotion,
+  resetCapture,
+  resetPreview,
+  hasCompletedFirstCapture,
+  setHasCompletedFirstCapture,
+  nudgeDismissed,
+  pushSupported,
+])
 
   // 3. Cancel preview — card slides down, input retains text
   const handleCancelPreview = useCallback(() => {
