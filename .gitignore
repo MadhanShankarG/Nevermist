@@ -7,7 +7,7 @@ node_modules/
 out/
 build/
 
-# Environment — NEVER commit this
+# Environment
 .env.local
 .env*.local
 

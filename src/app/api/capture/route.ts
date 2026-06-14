@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, isAuthenticated } from '@/lib/auth-guard'
 import { prisma } from '@/lib/prisma'
 import { buildSystemPrompt, callClaude, fetchUrlMeta } from '@/lib/ai'
+import { checkRateLimit } from '@/lib/rate-limit'
 import type { CaptureResult } from '@/types/capture'
 
 const URL_PATTERN = /^https?:\/\/\S+|^www\.\S+/i
@@ -30,6 +31,15 @@ export async function POST(request: NextRequest) {
   const auth = await requireAuth()
   if (!isAuthenticated(auth)) return auth
 
+  // Rate limit: 20 captures per minute per user
+  const { allowed } = checkRateLimit(auth.userId, 20, 60 * 1000)
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please wait a moment.' },
+      { status: 429 }
+    )
+  }
+
   try {
     const body = await request.json()
     let { inputMode } = body as { inputMode?: string }
@@ -42,6 +52,24 @@ export async function POST(request: NextRequest) {
     if (!inputValue && !imageData) {
       return NextResponse.json(
         { error: 'inputValue or imageData is required' },
+        { status: 400 }
+      )
+    }
+
+    // Input length validation
+    const MAX_INPUT_LENGTH = 2000
+    if (inputValue && inputValue.length > MAX_INPUT_LENGTH) {
+      return NextResponse.json(
+        { error: `Input too long. Maximum ${MAX_INPUT_LENGTH} characters.` },
+        { status: 400 }
+      )
+    }
+
+    // Image size validation (base64 string — 4MB limit)
+    const MAX_IMAGE_SIZE = 4 * 1024 * 1024 * 1.37 // base64 overhead
+    if (imageData && imageData.length > MAX_IMAGE_SIZE) {
+      return NextResponse.json(
+        { error: 'Image too large. Maximum 4MB.' },
         { status: 400 }
       )
     }
