@@ -35,7 +35,20 @@ Thumbs.db
 *.njsproj
 *.sln
 
-# Docs 
+# Docs
 *.docx
 *.doc
 /generated/prisma
+docs/
+
+# Internal development files — not for public repo
+.cursorrules
+.cursorignore
+nevermist-system-prompt.txt
+nevermist-*.md
+nevermist-*.docx
+*-phases-*.md
+*phase-prompt*
+*-prd*
+*-design-doc*
+*-tech-stack*

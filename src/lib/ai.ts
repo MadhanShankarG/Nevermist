@@ -1,15 +1,14 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { readFileSync } from 'fs'
-import { join } from 'path'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 })
 
-const SYSTEM_PROMPT_TEMPLATE = readFileSync(
-  join(process.cwd(), 'nevermist-system-prompt.txt'),
-  'utf-8'
-)
+const SYSTEM_PROMPT_TEMPLATE = process.env.SYSTEM_PROMPT ?? ''
+
+if (!SYSTEM_PROMPT_TEMPLATE) {
+  console.warn('WARNING: SYSTEM_PROMPT env var is not set')
+}
 
 interface PageInput {
   name: string
@@ -82,7 +81,7 @@ Return format: [{ "name": "page name", "description": "generated description" }]
 
 /**
  * Builds the system prompt for the capture endpoint.
- * Reads nevermist-system-prompt.txt as the base template.
+ * Reads SYSTEM_PROMPT env var as the base template.
  * Injects user's pages, current datetime, and textPolish setting.
  */
 export function buildSystemPrompt(
