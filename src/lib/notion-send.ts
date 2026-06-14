@@ -45,6 +45,27 @@ function formatTime(time: string): string {
   return `${displayHours}:${String(mins).padStart(2, '0')} ${period}`
 }
 
+function getTimezoneOffset(timezone: string): string {
+  try {
+    const now = new Date()
+    const formatter = new Intl.DateTimeFormat('en', {
+      timeZone: timezone,
+      timeZoneName: 'shortOffset',
+    })
+    const parts = formatter.formatToParts(now)
+    const offsetPart = parts.find(p => p.type === 'timeZoneName')?.value ?? 'GMT+5:30'
+    // offsetPart looks like "GMT+5:30" — convert to "+05:30"
+    const match = offsetPart.match(/GMT([+-])(\d+):(\d+)/)
+    if (!match) return '+05:30'
+    const sign = match[1]
+    const hours = match[2].padStart(2, '0')
+    const mins = match[3].padStart(2, '0')
+    return `${sign}${hours}:${mins}`
+  } catch {
+    return '+05:30' // fallback to IST
+  }
+}
+
 export async function sendSingleTask(
   notion: Client,
   task: SingleTaskPayload,
@@ -88,26 +109,31 @@ export async function sendSingleTask(
       ? `${task.cleanedTask} (${formatTime(task.dueTime)})`
       : task.cleanedTask
 
+    
+    const timezone = (task as { timezone?: string }).timezone ?? 'Asia/Kolkata'
+    const offset = getTimezoneOffset(timezone)
+
+    const dateProperty = task.dueTime
+      ? {
+        start: `${task.dueDate}T${task.dueTime}:00${offset}`,
+        end: `${task.dueDate}T${getEndTime(task.dueTime, task.duration || 60)}:00${offset}`,
+      }
+      : {
+        start: task.dueDate,
+      }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const properties: Record<string, any> = {
       [titleProp]: {
         title: [{ text: { content: titleWithTime } }],
       },
     }
-
     if (hasPriorityProp) {
       properties[priorityPropName] = { select: { name: priorityOptionName } }
     }
 
     if (hasDueDateProp && task.dueDate) {
-      const dateValue = task.dueTime
-        ? {
-            start: `${task.dueDate}T${task.dueTime}:00`,
-            end: `${task.dueDate}T${getEndTime(task.dueTime, task.duration || 60)}:00`,
-          }
-        : { start: task.dueDate }
-      properties[dueDatePropName] = { date: dateValue }
-    }
+  properties[dueDatePropName] = { date: dateProperty }
+}
 
     if (hasStatusProp) {
       properties['Status'] = { select: { name: 'To Do' } }

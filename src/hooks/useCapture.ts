@@ -86,6 +86,7 @@ export function useCapture() {
           inputValue,
           inputMode,
           imageData: imageData ?? null,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       })
 

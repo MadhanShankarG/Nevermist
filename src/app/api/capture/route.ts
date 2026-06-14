@@ -33,9 +33,10 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     let { inputMode } = body as { inputMode?: string }
-    const { inputValue, imageData } = body as {
+    const { inputValue, imageData, timezone } = body as {
       inputValue?: string
       imageData?: string | null
+      timezone?: string
     }
 
     if (!inputValue && !imageData) {
@@ -166,7 +167,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    return NextResponse.json(parsed as CaptureResult)
+    return NextResponse.json({ ...(parsed as CaptureResult), timezone: timezone ?? 'Asia/Kolkata' })
   } catch (err) {
     console.error('Capture endpoint error:', err)
     return NextResponse.json(
