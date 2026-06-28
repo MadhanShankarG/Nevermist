@@ -38,7 +38,7 @@ export async function generatePageDescriptions(
     .join('\n')
 
   const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 1024,
     system: `You generate 1-sentence descriptions for Notion pages. These descriptions help an AI route tasks to the right page.
 
@@ -116,7 +116,7 @@ export async function callClaude(
 ): Promise<string> {
   const message = await anthropic.messages.create(
     {
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       system: systemPrompt,
       messages: [
