@@ -50,10 +50,11 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     let { inputMode } = body as { inputMode?: string }
-    const { inputValue, imageData, timezone } = body as {
+    const { inputValue, imageData, timezone, isMultiTask } = body as {
       inputValue?: string
       imageData?: string | null
       timezone?: string
+      isMultiTask?: boolean
     }
 
     if (!inputValue && !imageData) {
@@ -142,7 +143,11 @@ export async function POST(request: NextRequest) {
     } else if (inputMode === 'url' && urlMeta) {
       userMessage = `${inputValue}\n\nPage title: ${urlMeta.title}\nMeta: ${urlMeta.description}`
     } else {
-      userMessage = inputValue || ''
+      // Multi-task mode appends a special instruction to guide Claude
+      const baseText = inputValue || ''
+      userMessage = isMultiTask
+        ? `${baseText}\n\n[MULTI-TASK MODE: Split this input into separate tasks. Each comma-separated item or new line is a separate task. Return a JSON array where each element is a complete task object with all required fields. Apply routing, priority, due date and time extraction individually to each task.]`
+        : baseText
     }
 
     let rawResponse: string
@@ -170,6 +175,29 @@ export async function POST(request: NextRequest) {
         { error: 'AI response was not valid JSON' },
         { status: 500 }
       )
+    }
+
+    if (isMultiTask) {
+      if (!Array.isArray(parsed)) {
+        // Claude returned a single object — wrap it in an array
+        parsed = [parsed]
+      }
+
+      for (const [index, item] of (parsed as unknown[]).entries()) {
+        if (!validateCaptureResult(item)) {
+          const missing = getMissingFields(item)
+          console.error(
+            `[capture] multi-task task[${index}] missing fields: ${missing.join(', ')}`,
+            JSON.stringify(item, null, 2)
+          )
+          return NextResponse.json(
+            { error: `AI response missing required fields in multi-task response: ${missing.join(', ')}` },
+            { status: 500 }
+          )
+        }
+      }
+
+      return NextResponse.json({ tasks: parsed as CaptureResult[] })
     }
 
     if (inputMode === 'photo') {

@@ -258,6 +258,8 @@ export default function Home() {
   const processingError = useCaptureStore((s) => s.processingError)
   const setInputMode = useCaptureStore((s) => s.setInputMode)
   const resetCapture = useCaptureStore((s) => s.reset)
+  const isMultiTask = useCaptureStore((s) => s.isMultiTask)
+  const setIsMultiTask = useCaptureStore((s) => s.setIsMultiTask)
 
   const preview = usePreviewStore()
   const resetPreview = usePreviewStore((s) => s.reset)
@@ -742,6 +744,52 @@ export default function Home() {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {/* ── Multi-task toggle button ── */}
+                <button
+                  id="multi-task-toggle"
+                  onClick={() => setIsMultiTask(!isMultiTask)}
+                  title="Multi-task mode — separate with commas or new lines"
+                  aria-label="Toggle multi-task mode"
+                  aria-pressed={isMultiTask}
+                  style={{
+                    width: '44px',
+                    height: '44px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'none',
+                    border: isMultiTask ? '1px solid var(--accent)' : 'none',
+                    borderRadius: isMultiTask ? '8px' : '0',
+                    cursor: 'pointer',
+                    color: isMultiTask ? 'var(--accent)' : 'var(--ink3)',
+                    position: 'relative',
+                    flexShrink: 0,
+                    transition: 'color 150ms ease, border-color 150ms ease',
+                    padding: 0,
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                    <line x1="4" y1="6" x2="20" y2="6"/>
+                    <line x1="4" y1="12" x2="16" y2="12"/>
+                    <line x1="4" y1="18" x2="12" y2="18"/>
+                  </svg>
+                  {/* Amber dot indicator when active */}
+                  {isMultiTask && (
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        position: 'absolute',
+                        top: '8px',
+                        right: '8px',
+                        width: '5px',
+                        height: '5px',
+                        borderRadius: '50%',
+                        background: 'var(--accent)',
+                      }}
+                    />
+                  )}
+                </button>
                 <VoiceButton isRecording={isRecording} onToggle={handleVoiceToggle} />
                 <CameraButton onCapture={handleCameraCapture} />
               </div>

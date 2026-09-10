@@ -13,6 +13,7 @@ export function useCapture() {
   const setIsProcessing = useCaptureStore((s) => s.setIsProcessing)
   const setProcessingError = useCaptureStore((s) => s.setProcessingError)
   const resetCapture = useCaptureStore((s) => s.reset)
+  const isMultiTask = useCaptureStore((s) => s.isMultiTask)
   const setPreview = usePreviewStore((s) => s.setPreview)
   const setIsOnline = useQueueStore((s) => s.setIsOnline)
   const setItems = useQueueStore((s) => s.setItems)
@@ -87,6 +88,7 @@ export function useCapture() {
           inputMode,
           imageData: imageData ?? null,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          isMultiTask,
         }),
       })
 
@@ -96,8 +98,8 @@ export function useCapture() {
         throw new Error(data.error || 'Capture failed')
       }
 
-      // Photo mode — array of tasks
-      if (inputMode === 'photo' && Array.isArray(data.tasks)) {
+      // Photo mode OR multi-task mode — array of tasks
+      if ((inputMode === 'photo' || isMultiTask) && Array.isArray(data.tasks)) {
         setPreview({
           visible: true,
           tasks: data.tasks as CaptureResult[],
@@ -170,7 +172,7 @@ export function useCapture() {
     } finally {
       setIsProcessing(false)
     }
-  }, [inputValue, inputMode, setIsProcessing, setProcessingError, setPreview, setIsOnline, syncQueueStore, resetCapture])
+  }, [inputValue, inputMode, isMultiTask, setIsProcessing, setProcessingError, setPreview, setIsOnline, syncQueueStore, resetCapture])
 
   // ─────────────────────────────────────────────────────────────────────
   // sendToNotion — called from page.tsx after user confirms preview card.

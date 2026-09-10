@@ -13,6 +13,7 @@ export default function CaptureInput({ onSubmit }: CaptureInputProps) {
   const inputMode = useCaptureStore((s) => s.inputMode)
   const setInputValue = useCaptureStore((s) => s.setInputValue)
   const setInputMode = useCaptureStore((s) => s.setInputMode)
+  const isMultiTask = useCaptureStore((s) => s.isMultiTask)
   const hasCompletedFirstCapture = useUserStore((s) => s.hasCompletedFirstCapture)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -60,9 +61,12 @@ export default function CaptureInput({ onSubmit }: CaptureInputProps) {
     }
   }
 
-  const placeholder = hasCompletedFirstCapture
-    ? "What's on your mind?"
-    : "Try it — say 'buy groceries tomorrow' and hit send"
+  // Multi-task mode overrides the placeholder
+  const placeholder = isMultiTask
+    ? 'Enter tasks separated by commas or new lines...'
+    : hasCompletedFirstCapture
+      ? "What's on your mind?"
+      : "Try it — say 'buy groceries tomorrow' and hit send"
 
   const placeholderOpacity = hasCompletedFirstCapture ? 0.7 : 0.4
 
