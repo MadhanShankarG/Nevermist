@@ -133,7 +133,14 @@ export async function sendSingleTask(
 }
 
     if (hasStatusProp) {
-      properties['Status'] = { select: { name: 'To Do' } }
+      const statusPropType = schemaProps['Status']?.type
+      if (statusPropType === 'status') {
+        // Notion's native Status type — must use { status: { name } }, NOT { select: { name } }
+        properties['Status'] = { status: { name: 'Not started' } }
+      } else {
+        // Regular Select property named "Status"
+        properties['Status'] = { select: { name: 'To Do' } }
+      }
     }
 
     if (task.isUrl && task.sourceUrl && 'URL' in schemaProps) {

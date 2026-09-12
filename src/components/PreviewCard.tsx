@@ -53,7 +53,9 @@ export default function PreviewCard({ onSend, onCancel, isSending }: PreviewCard
   }, [])
 
   const cyclePriority = () => {
-    preview.setPreview({ priority: PRIORITY_CYCLE[preview.priority] ?? 'P2' })
+    // Read from getState() so we always get the current value, never a stale closure
+    const current = usePreviewStore.getState().priority
+    usePreviewStore.getState().setPreview({ priority: PRIORITY_CYCLE[current] ?? 'P2' })
   }
 
   const priorityStyle = PRIORITY_COLORS[preview.priority] ?? PRIORITY_COLORS.P2
