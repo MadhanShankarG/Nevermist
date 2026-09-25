@@ -247,6 +247,264 @@ function IosInstallBanner({ onDismiss }: { onDismiss: () => void }) {
   )
 }
 
+// ── Landing Page ───────────────────────────────────────────────────────────
+function LandingPage() {
+  const features = [
+    {
+      eyebrow: 'Speak, Type, or Snap',
+      eyebrowColor: '#C4944A',
+      headline: 'Three ways to capture.\nZero friction.',
+      description:
+        'Drop a voice note on the go, type a quick thought, or snap a photo of handwritten notes. Nevermist parses all three and routes them to the right place in Notion.',
+      reverse: false,
+    },
+    {
+      eyebrow: 'Never Lose a Thought',
+      eyebrowColor: '#6BA888',
+      headline: 'Works offline.\nSyncs when ready.',
+      description:
+        'No signal? No problem. Every capture is queued locally and pushed to Notion the moment you reconnect — without you lifting a finger.',
+      reverse: true,
+    },
+    {
+      eyebrow: 'Syncs to Your Calendar',
+      eyebrowColor: '#7BAED4',
+      headline: 'From capture\nto calendar.',
+      description:
+        'Tasks with times become calendar events instantly. Subscribe to your personal iCal feed and see your Notion tasks in Apple Calendar, Google Calendar, or any other client.',
+      reverse: false,
+    },
+  ]
+
+  return (
+    <div className="landing-root">
+      {/* Gradient blobs */}
+      <div className="landing-blobs" aria-hidden="true">
+        <div className="landing-blob-sky" />
+      </div>
+
+      {/* ── Nav ── */}
+      <nav className="landing-nav" aria-label="Main navigation">
+        <span
+          style={{
+            fontFamily: 'var(--font-serif)',
+            fontSize: '15px',
+            fontWeight: 400,
+            letterSpacing: '0.2em',
+            textTransform: 'lowercase',
+            color: '#1A1714',
+            userSelect: 'none',
+          }}
+        >
+          nevermist
+        </span>
+        <a
+          id="landing-nav-cta"
+          href="/api/auth/notion"
+          className="pill-button-dark"
+          aria-label="Connect Notion to get started"
+        >
+          Connect Notion
+        </a>
+      </nav>
+
+      {/* ── Hero ── */}
+      <section
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: '1200px',
+          margin: '0 auto',
+          padding: '80px 60px 120px',
+        }}
+        aria-labelledby="hero-headline"
+      >
+        <span className="eyebrow-label" style={{ color: '#C4944A', marginBottom: '20px' }}>
+          Capture
+        </span>
+        <h1
+          id="hero-headline"
+          className="landing-hero-headline"
+          style={{
+            fontFamily: 'var(--font-serif)',
+            fontSize: '56px',
+            fontWeight: 500,
+            lineHeight: 1.12,
+            color: '#1A1714',
+            marginTop: '16px',
+            marginBottom: '24px',
+            maxWidth: '640px',
+            letterSpacing: '-0.01em',
+          }}
+        >
+          Every thought.<br />One place.
+        </h1>
+        <p
+          style={{
+            fontFamily: 'var(--font-sans)',
+            fontSize: '16px',
+            lineHeight: 1.65,
+            color: '#5C5248',
+            maxWidth: '480px',
+            marginBottom: '40px',
+          }}
+        >
+          Nevermist is the fastest way to get ideas, tasks, and notes into Notion — by voice, text, or photo. AI parses, routes, and structures everything for you.
+        </p>
+        <a
+          id="hero-cta"
+          href="/api/auth/notion"
+          className="pill-button-dark"
+          style={{ fontSize: '14px', padding: '14px 32px' }}
+          aria-label="Connect Notion and get started"
+        >
+          Connect Notion →
+        </a>
+      </section>
+
+      {/* ── Feature Sections ── */}
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: '1200px',
+          margin: '0 auto',
+          padding: '0 60px 120px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '100px',
+        }}
+      >
+        {features.map((feat, i) => (
+          <section
+            key={i}
+            aria-labelledby={`feature-headline-${i}`}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '64px',
+              alignItems: 'center',
+              direction: feat.reverse ? 'rtl' : 'ltr',
+            }}
+            className="landing-feature-grid"
+          >
+            {/* Text side */}
+            <div style={{ direction: 'ltr' }} className="landing-feature-grid-rev">
+              <span
+                className="eyebrow-label"
+                style={{ color: feat.eyebrowColor, marginBottom: '16px' }}
+              >
+                {feat.eyebrow}
+              </span>
+              <h2
+                id={`feature-headline-${i}`}
+                style={{
+                  fontFamily: 'var(--font-serif)',
+                  fontSize: '34px',
+                  fontWeight: 500,
+                  lineHeight: 1.18,
+                  color: '#1A1714',
+                  marginTop: '12px',
+                  marginBottom: '18px',
+                  letterSpacing: '-0.01em',
+                  whiteSpace: 'pre-line',
+                }}
+              >
+                {feat.headline}
+              </h2>
+              <p
+                style={{
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: '15px',
+                  lineHeight: 1.7,
+                  color: '#5C5248',
+                  maxWidth: '400px',
+                }}
+              >
+                {feat.description}
+              </p>
+            </div>
+
+            {/* Image placeholder */}
+            <div style={{ direction: 'ltr' }}>
+              <div
+                className="landing-img-placeholder"
+                aria-label={`${feat.eyebrow} screenshot placeholder`}
+                role="img"
+              >
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '11px',
+                    letterSpacing: '0.08em',
+                    color: 'rgba(26,23,20,0.28)',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  screenshot coming soon
+                </span>
+              </div>
+            </div>
+          </section>
+        ))}
+      </div>
+
+      {/* ── Footer ── */}
+      <footer
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          borderTop: '1px solid rgba(26,23,20,0.1)',
+          padding: '32px 60px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          maxWidth: '1200px',
+          margin: '0 auto',
+          width: '100%',
+        }}
+      >
+        <span
+          style={{
+            fontFamily: 'var(--font-serif)',
+            fontSize: '13px',
+            letterSpacing: '0.18em',
+            textTransform: 'lowercase',
+            color: '#9C9088',
+          }}
+        >
+          nevermist
+        </span>
+        <a
+          id="footer-github"
+          href="https://github.com/MadhanShankarG/Nevermist"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '11px',
+            letterSpacing: '0.06em',
+            color: '#9C9088',
+            textDecoration: 'none',
+            transition: 'color 150ms ease',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = '#1A1714' }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = '#9C9088' }}
+        >
+          GitHub ↗
+        </a>
+      </footer>
+
+      {/* Mobile responsive padding */}
+      <style>{`
+        @media (max-width: 768px) {
+          #hero-headline { font-size: 40px !important; }
+        }
+      `}</style>
+    </div>
+  )
+}
+
 export default function Home() {
   const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
@@ -350,7 +608,6 @@ export default function Home() {
   useEffect(() => {
     if (isLoading) return
     if (!isAuthenticated) {
-      router.replace('/connect')
       return
     }
 
@@ -578,7 +835,7 @@ export default function Home() {
 
   // ── Render ──
 
-  if (isLoading || (!isAuthenticated && hasPages === null)) {
+  if (isLoading) {
     return (
       <main
         style={{
@@ -595,6 +852,10 @@ export default function Home() {
         loading...
       </main>
     )
+  }
+
+  if (!isAuthenticated) {
+    return <LandingPage />
   }
 
   if (!hasPages) return null

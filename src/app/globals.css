@@ -123,3 +123,144 @@ body::before {
     display: none;
   }
 }
+
+/* ─────────────────────────────────────────────
+   Landing Page — Utility Classes
+   Light editorial, warm off-white background
+   ───────────────────────────────────────────── */
+
+.landing-root {
+  background: #FAF8F4;
+  color: #1A1714;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Radial gradient blobs behind hero */
+.landing-blobs {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.landing-blobs::before {
+  content: "";
+  position: absolute;
+  top: -120px;
+  left: -80px;
+  width: 560px;
+  height: 560px;
+  background: radial-gradient(ellipse at center, #F5C4A0 0%, transparent 70%);
+  opacity: 0.38;
+  filter: blur(80px);
+}
+
+.landing-blobs::after {
+  content: "";
+  position: absolute;
+  top: 40px;
+  right: -100px;
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(ellipse at center, #C9BFEE 0%, transparent 70%);
+  opacity: 0.28;
+  filter: blur(90px);
+}
+
+.landing-blob-sky {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 500px;
+  height: 340px;
+  background: radial-gradient(ellipse at center, #AADCF0 0%, transparent 70%);
+  opacity: 0.22;
+  filter: blur(70px);
+  pointer-events: none;
+}
+
+/* Reusable pill button */
+.pill-button-dark {
+  background: #1A1714;
+  color: #FAF8F4;
+  border-radius: 999px;
+  padding: 12px 28px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: opacity 150ms ease, transform 150ms ease;
+  text-decoration: none;
+}
+
+.pill-button-dark:hover {
+  opacity: 0.82;
+  transform: translateY(-1px);
+}
+
+.pill-button-dark:active {
+  transform: translateY(0);
+  opacity: 0.72;
+}
+
+/* Eyebrow label */
+.eyebrow-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 500;
+  display: inline-block;
+}
+
+/* Landing nav */
+.landing-nav {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28px 60px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Feature section image placeholder */
+.landing-img-placeholder {
+  border-radius: 16px;
+  border: 1.5px solid rgba(26, 23, 20, 0.12);
+  background: rgba(26, 23, 20, 0.04);
+  aspect-ratio: 16/10;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Mobile responsive — landing */
+@media (max-width: 768px) {
+  .landing-nav {
+    padding: 22px 28px;
+  }
+
+  .landing-feature-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .landing-feature-grid-rev {
+    direction: ltr !important;
+  }
+
+  .landing-hero-headline {
+    font-size: 40px !important;
+  }
+}
