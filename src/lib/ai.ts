@@ -1,14 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { CAPTURE_SYSTEM_PROMPT } from './system-prompt'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 })
-
-const SYSTEM_PROMPT_TEMPLATE = process.env.SYSTEM_PROMPT ?? ''
-
-if (!SYSTEM_PROMPT_TEMPLATE) {
-  console.warn('WARNING: SYSTEM_PROMPT env var is not set')
-}
 
 interface PageInput {
   name: string
@@ -81,7 +76,7 @@ Return format: [{ "name": "page name", "description": "generated description" }]
 
 /**
  * Builds the system prompt for the capture endpoint.
- * Reads SYSTEM_PROMPT env var as the base template.
+ * Reads from CAPTURE_SYSTEM_PROMPT (imported from system-prompt.ts).
  * Injects user's pages, current datetime, and textPolish setting.
  */
 export function buildSystemPrompt(
@@ -93,7 +88,7 @@ export function buildSystemPrompt(
     .map((p, i) => `${i + 1}. "${p.name}" (ID: ${p.notionPageId}) — ${p.description}`)
     .join('\n')
 
-  let prompt = SYSTEM_PROMPT_TEMPLATE
+  let prompt = CAPTURE_SYSTEM_PROMPT
     .replace('{{PAGE_LIST}}', pageList)
     .replace('{{CURRENT_DATETIME}}', currentDatetime)
 
